@@ -1,0 +1,34 @@
+{
+	"C++ Class": {
+		"prefix": "cls",
+		"body": [
+			"class ${1:ClassName}",
+			"{",
+			"public:",
+			"\t$0",
+			"};"
+		],
+		"description": "C++ class（自动带末尾分号）"
+	},
+	"C++ Class with base": {
+		"prefix": "clsb",
+		"body": [
+			"class ${1:ClassName} : public ${2:BaseClass}",
+			"{",
+			"public:",
+			"\t$0",
+			"};"
+		],
+		"description": "C++ 继承类（自动带末尾分号）"
+	},
+	"C++ Struct": {
+		"prefix": "struct",
+		"body": [
+			"struct ${1:StructName}",
+			"{",
+			"\t$0",
+			"};"
+		],
+		"description": "C++ struct"
+	}
+}
