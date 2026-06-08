@@ -1,0 +1,14 @@
+[
+    {
+        "name": "VS 2022 Professional x64",
+        "visualStudio": "VisualStudio.17.Release",
+        "visualStudioArchitecture": "x64",
+        "environmentVariables": {
+            "VsInstallRoot": "D:\\ProgramFiles\\VisualStudio2022"
+        },
+        "preferredGenerator": {
+            "name": "Visual Studio 17 2022",
+            "platform": "x64"
+        }
+    }
+]

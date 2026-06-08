@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug PathTracing (CMake)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/source/Debug/PathTracing.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "build PathTracing"
+        },
+        {
+            "name": "Debug PathTracing (VS 工程)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/PathTracing/x64/Debug/PathTracing.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        }
+    ]
+}

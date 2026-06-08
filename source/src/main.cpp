@@ -1,5 +1,6 @@
 #include <iostream>
 #include <glm/glm.hpp>
+#include "thread_pool.h"
 
 int main()
 {

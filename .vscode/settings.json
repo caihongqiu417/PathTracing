@@ -1,0 +1,13 @@
+{
+    "cmake.configureOnOpen": true,
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.platform": "x64",
+    "cmake.preferredGenerators": [
+        "Visual Studio 17 2022"
+    ],
+    "cmake.cmakePath": "D:/ProgramFiles/VisualStudio2022/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe",
+    "cmake.defaultKit": "VS 2022 Professional x64",
+    "cmake.useCMakePresets": "never"
+}

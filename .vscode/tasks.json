@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build PathTracing",
+            "type": "shell",
+            "command": "D:/ProgramFiles/VisualStudio2022/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "--config",
+                "Debug",
+                "--target",
+                "PathTracing"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
