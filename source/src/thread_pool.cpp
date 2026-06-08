@@ -2,61 +2,85 @@
 
 ThreadPool::ThreadPool(size_t thread_count)
 {
-	alive = true;
-	// 未指定线程数（参数为0）→ 自动获取CPU核心数
-    if (thread_count == 0)
-        thread_count = std::thread::hardware_concurrency();
+	alive = 1;
 
-    // 创建指定个数线程，这些线程会立即执行工作函数
-    for (size_t i = 0; i < thread_count; i++)
-        threads.push_back(std::thread(ThreadPool::WorkerThread, this));
+	if (thread_count == 0)
+		thread_count = std::thread::hardware_concurrency();
+
+	for (size_t i = 0; i < thread_count; i++)
+		threads.emplace_back(ThreadPool::WorkerThread, this);
+}
+
+void ThreadPool::Wait() const
+{
+	while (!tasks.empty())
+		std::this_thread::yield();
 }
 
 ThreadPool::~ThreadPool()
 {
-	//循环检查任务队列是否为空
-	while (!tasks.empty())
-		std::this_thread::yield();	 // 让出CPU，等任务被取走
+	Wait();
 
-	alive = false;
-	// 等待所有线程执行完毕
-    for (auto& thread : threads)
-        thread.join();
+	alive = 0;
 
-    // 清空线程
-    threads.clear();
+	for (auto& thread : threads)
+		thread.join();
+
+	threads.clear();
 }
 
-// 每个线程的工作函数：
-//	从任务队列取出任务并执行(如果任务为空则让出)
 void ThreadPool::WorkerThread(ThreadPool* master)
 {
-	while (master->alive)
+	while (master->alive == 1)
 	{
 		Task* task = master->GetTask();
 		if (task != nullptr)
-		{
 			task->run();
-		}
 		else
-		{
 			std::this_thread::yield();
+	}
+}
+
+/// ParallelFor 的内部任务：对单个 (x, y) 调用回调
+class ParallelForTask : public Task
+{
+public:
+	ParallelForTask(size_t x, size_t y, const std::function<void(size_t, size_t)>& lambda)
+		: x(x), y(y), lambda(lambda)
+	{
+	}
+
+	void run() override
+	{
+		lambda(x, y);
+	}
+
+private:
+	size_t x, y;
+	std::function<void(size_t, size_t)> lambda;
+};
+
+void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda)
+{
+	for (size_t y = 0; y < height; y++)
+	{
+		for (size_t x = 0; x < width; x++)
+		{
+			//创建任务对象
+			AddTask(new ParallelForTask(x, y, lambda));
 		}
 	}
 }
 
-// 添加任务到任务队列
 void ThreadPool::AddTask(Task* task)
 {
-	std::lock_guard<std::mutex> guard(lock);  // 自动加锁，离开作用域自动解锁
-	
+	Guard guard{ spin_lock };
 	tasks.push_back(task);
 }
 
-// 从队列取出一个任务（由工作线程调用）
 Task* ThreadPool::GetTask()
 {
-	std::lock_guard<std::mutex> guard(lock);
+	Guard guard{ spin_lock };
 
 	if (tasks.empty())
 		return nullptr;

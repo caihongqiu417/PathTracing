@@ -1,41 +1,43 @@
-#pragma once 
+#pragma once
 
-#include<vector>   
-#include<thread>    
-#include<list>     
-#include<mutex>    
+#include <functional>
+#include <list>
+#include <thread>
+#include <vector>
 
-/*
-* 线程池：预先创建一批线程，用于并行执行任务
-*/
+#include "spin_lock.h"
 
-/** 任务基类（抽象类）*/
-class Task{
+/// 任务基类，子类实现 run() 以定义具体逻辑
+class Task
+{
 public:
-    virtual void run() = 0;  // 纯虚函数，具体任务需要继承并实现这个方法
+	virtual void run() = 0;
+	virtual ~Task() = default;
 };
 
+/// 固定数量工作线程 + 任务队列，支持自定义 Task 与 ParallelFor
 class ThreadPool
 {
 public:
-    /// @brief 创建线程池
-    /// @param thread_count 指定线程数量（0表示自动检测CPU核心数）
-    ThreadPool(size_t thread_count = 0);
+	/// @param thread_count 工作线程数；为 0 时使用 CPU 核心数
+	ThreadPool(size_t thread_count = 0);
+	~ThreadPool();
 
-    ~ThreadPool();  // 析构函数：等待线程结束并清理资源
+	/// 工作线程入口，从队列取任务并执行
+	static void WorkerThread(ThreadPool* master);
 
-    // 每个线程执行的工作函数（静态，作为线程入口）
-    static void WorkerThread(ThreadPool* master);
+	/// 对 [0, width) × [0, height) 每个坐标提交一个并行任务
+	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda);
 
-    // 添加任务到队列
-    void AddTask(Task* task);
-    
-    // 从队列取出一个任务（没有则返回nullptr）
-    Task* GetTask();
-    
+	void AddTask(Task* task);
+	Task* GetTask();
+
+	/// 阻塞直到任务队列被取空（不保证任务已执行完毕）
+	void Wait() const;
+
 private:
-    bool alive;
-    std::vector<std::thread> threads;  // 存储所有工作线程
-    std::list<Task*> tasks;            // 任务队列（链表）
-    std::mutex lock;                   // 互斥锁（保护tasks的线程安全）
+	std::atomic<int> alive;              // 1 = 运行中，0 = 请求退出
+	std::vector<std::thread> threads;
+	std::list<Task*> tasks;
+	SpinLock spin_lock;
 };
