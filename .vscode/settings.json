@@ -9,5 +9,16 @@
     ],
     "cmake.cmakePath": "D:/ProgramFiles/VisualStudio2022/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe",
     "cmake.defaultKit": "VS 2022 Professional x64",
-    "cmake.useCMakePresets": "never"
+    "cmake.useCMakePresets": "never",
+
+    "editor.autoIndent": "full",
+    "editor.detectIndentation": true,
+    "editor.formatOnType": true,
+    "[cpp]": {
+        "editor.autoIndent": "full",
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false,
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "C_Cpp.formatting": "vcFormat"
 }

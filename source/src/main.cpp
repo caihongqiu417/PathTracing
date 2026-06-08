@@ -2,9 +2,25 @@
 #include <glm/glm.hpp>
 #include "thread_pool.h"
 
+class SimpleTask : public Task
+{
+public:
+	void run() override
+	{
+		std::cout << "Hello World" << std::endl;
+	}
+};
 int main()
 {
-	glm::vec3 test = { 1,2,3 };
-	std::cout << "Hello World!" << std::endl;
+	//创建线程池
+	ThreadPool thread_pool{};
+
+	//加入一个任务
+	thread_pool.AddTask(new SimpleTask());
+	thread_pool.AddTask(new SimpleTask());
+	thread_pool.AddTask(new SimpleTask());
+	thread_pool.AddTask(new SimpleTask());
+	thread_pool.AddTask(new SimpleTask());
+
 	return 0;
 }

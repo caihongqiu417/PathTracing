@@ -1,6 +1,6 @@
 # 指定构建本项目所需的最低 CMake 版本为 3.7
 # 如果当前 CMake 版本低于 3.7，会报错并停止运行
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.14)
 
 # 定义项目名称为 PathTracing
 # 并声明项目使用 C++ 语言（LANGUAGES CXX）
