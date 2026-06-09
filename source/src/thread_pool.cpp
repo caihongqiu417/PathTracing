@@ -1,10 +1,18 @@
+// =============================================================================
+// ThreadPool — 三类线程协作（与 main.cpp 配合）
+//
+//   【主线程】  创建 ThreadPool、Wait()、Save
+//   【入队线程】 main 里 std::thread 跑 ParallerlFor，只 AddTask
+//   【Worker】  本文件 WorkerThread，取队列任务并 run()
+// =============================================================================
+
 #include "thread_pool.h"
 
 #include <atomic>
 
 // =============================================================================
 // ParallelForTask — ParallelFor 的内部任务（仅本文件使用）
-// 保存坐标 (x, y) 和共享回调，run() 时调用 lambda(x, y)
+// 保存坐标 (x, y) 和共享回调，run() 时在【Worker 线程】调用 lambda(x, y)
 // =============================================================================
 class ParallelForTask : public Task
 {
@@ -25,7 +33,7 @@ private:
 };
 
 // =============================================================================
-// 生命周期
+// 生命周期 — 【主线程】构造时启动 Worker×N
 // =============================================================================
 
 ThreadPool::ThreadPool(size_t thread_count)
@@ -52,10 +60,8 @@ ThreadPool::~ThreadPool()
 }
 
 // =============================================================================
-// 同步
+// 同步 — 【主线程】Wait()：等 pending_task_count 归零
 // =============================================================================
-
-// 主线程在此空转等待，直到 pending_task_count 变为 0（队列里的任务全部 run 完）
 void ThreadPool::Wait() const
 {
 	while (pending_task_count.load(std::memory_order_acquire) > 0)
@@ -63,7 +69,7 @@ void ThreadPool::Wait() const
 }
 
 // =============================================================================
-// 工作线程
+// Worker 线程 — 循环取任务、执行 run()、pending_task_count--
 // =============================================================================
 
 void ThreadPool::WorkerThread(ThreadPool* master)
@@ -83,7 +89,7 @@ void ThreadPool::WorkerThread(ThreadPool* master)
 }
 
 // =============================================================================
-// 并行工具
+// 并行工具 — 【入队线程】调用：只创建 Task 并 AddTask，不跑 lambda
 // =============================================================================
 
 void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda)
@@ -96,7 +102,7 @@ void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<v
 }
 
 // =============================================================================
-// 任务队列
+// 任务队列 — 【入队线程】AddTask / 【Worker】GetTask
 // =============================================================================
 
 void ThreadPool::AddTask(Task* task)
