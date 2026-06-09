@@ -41,7 +41,9 @@ public:
 	void AddTask(Task* task);
 	Task* GetTask();
 
-	/// 阻塞直到任务队列为空（不保证任务已全部执行完毕）
+	/// 阻塞主线程，直到线程池里所有任务都执行完毕。
+	/// ParallelFor 只是把任务丢进队列就返回，不会等 worker 画完像素；
+	/// Save 前必须 Wait，否则胶片可能还是空的或只画了一半。
 	void Wait() const;
 
 	// --- 工作线程 ---
@@ -51,7 +53,8 @@ public:
 private:
 	// --- 成员变量 ---
 
-	std::atomic<int> alive;           // 1 = 运行中，0 = 请求退出
+	std::atomic<int> alive;                  // 1 = 运行中，0 = 请求退出
+	std::atomic<size_t> tasks_remaining{ 0 };  // AddTask +1，worker 执行完 -1；Wait 等到归零
 	std::vector<std::thread> threads; // 工作线程
 	std::list<Task*> tasks;           // 待执行的任务队列
 	SpinLock spin_lock;               // 保护 tasks 的并发访问

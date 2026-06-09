@@ -1,5 +1,7 @@
 #include "thread_pool.h"
 
+#include <atomic>
+
 // =============================================================================
 // ParallelForTask — ParallelFor 的内部任务（仅本文件使用）
 // 保存坐标 (x, y) 和共享回调，run() 时调用 lambda(x, y)
@@ -53,9 +55,10 @@ ThreadPool::~ThreadPool()
 // 同步
 // =============================================================================
 
+// 主线程在此空转等待，直到 tasks_remaining 变为 0（队列里的任务全部 run 完）
 void ThreadPool::Wait() const
 {
-	while (!tasks.empty())
+	while (tasks_remaining.load(std::memory_order_acquire) > 0)
 		std::this_thread::yield();
 }
 
@@ -69,7 +72,11 @@ void ThreadPool::WorkerThread(ThreadPool* master)
 	{
 		Task* task = master->GetTask();
 		if (task != nullptr)
+		{
 			task->run();
+			delete task;
+			master->tasks_remaining.fetch_sub(1, std::memory_order_release);
+		}
 		else
 			std::this_thread::yield();
 	}
@@ -96,6 +103,7 @@ void ThreadPool::AddTask(Task* task)
 {
 	Guard guard{ spin_lock };
 	tasks.push_back(task);
+	tasks_remaining.fetch_add(1, std::memory_order_release);
 }
 
 Task* ThreadPool::GetTask()
