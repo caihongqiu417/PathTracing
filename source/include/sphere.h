@@ -1,14 +1,24 @@
 #pragma once
 
-#include"ray.h"
-#include<optional>
+#include "shape.h"
 
-struct Sphere {
+// =============================================================================
+// Sphere — 球体
+// =============================================================================
+class Sphere : public Shape
+{
+public:
+	Sphere(const glm::vec3& center, float radius)
+		: center(center), radius(radius)
+	{
+	}
+
 	glm::vec3 center;
 	float radius;
 
-	/// @brief 计算射线与球体的交代呢举例
-	/// @param ray 相机到像素点的射线 ray.origin + t × ray.direction
-	/// @return 如果有交点，返回从射线起点到交点的距离t；否则返回空
-	std::optional<float> Intersect(const Ray& ray)const;
+	std::optional<HitInfo> Intersect(
+		const Ray& ray,
+		float t_min = 1e-5f,
+		float t_max = std::numeric_limits<float>::infinity()
+	) const override;
 };

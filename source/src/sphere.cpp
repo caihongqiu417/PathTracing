@@ -1,32 +1,30 @@
 #include "sphere.h"
 
-std::optional<float> Sphere::Intersect(const Ray &ray) const {
-    // 相机到球心的向量（从射线起点指向球心）
-    glm::vec3 co = ray.origin - center;
-    
-    // 解二次方程 t*2+2Bt+C=0;
-    
-    float b = 2 * glm::dot(ray.direction, co);  // B = 2·(dir · o-c)
-    float c = glm::dot(co, co) - radius * radius; // C = |o-c|² - r²
-    
-    float delta = b * b - 4 * c;  // 判别式 Δ = B² - 4AC
-    
-    // 无实数解 → 没有交点
-    if (delta < 0) { return {}; }
-    
-    // 取较小的根（离相机更近的交点）
-    float hit_t = (-b - glm::sqrt(delta)) * 0.5;
-    
-    // 如果较小根为负（在相机后方），尝试较大的根
-    if (hit_t < 0) {
-        hit_t = (-b + glm::sqrt(delta)) * 0.5;
-    }
-    
-    // 交点在相机前方 → 返回距离
-    if (hit_t > 0) {
-        return hit_t;
-    }
-    
-    // 所有交点都在相机后方 → 无有效交点
-    return {};
+#include "hit_info.h"
+
+#include <cmath>
+
+std::optional<HitInfo> Sphere::Intersect(const Ray& ray, float t_min, float t_max) const
+{
+	glm::vec3 oc = ray.origin - center;
+
+	float b = 2.f * glm::dot(ray.direction, oc);
+	float c = glm::dot(oc, oc) - radius * radius;
+	float delta = b * b - 4.f * c;
+
+	if (delta < 0.f)
+		return {};
+
+	float hit_t = (-b - std::sqrt(delta)) * 0.5f;
+
+	if (hit_t < t_min || hit_t > t_max)
+	{
+		hit_t = (-b + std::sqrt(delta)) * 0.5f;
+		if (hit_t < t_min || hit_t > t_max)
+			return {};
+	}
+
+	glm::vec3 point = ray.Hit(hit_t);
+	glm::vec3 normal = glm::normalize(point - center);
+	return HitInfo{ hit_t, point, normal };
 }
