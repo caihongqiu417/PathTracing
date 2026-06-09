@@ -6,17 +6,10 @@
 class Camera
 {
 public:
-	/// @brief 构造函数
-	/// @param film 胶片
-	/// @param pos 相机在哪
-	/// @param viewpoint 相机看向哪
-	/// @param fovy 垂直视野角(度)
+	// pos 是相机位置，viewpoint 是看向的位置，fovy 是垂直视野角
 	Camera(Film& film, const glm::vec3& pos, const glm::vec3& viewpoint, float fovy);
 
-	/// @brief 生成射线（相机->屏幕像素）
-	/// @param pixel_coord 像素坐标
-	/// @param offset 像素内偏移，默认中心(0.5,0.5)
-	/// @return 射线
+	// 给定一个像素，生成穿过这个像素的射线
 	Ray GenerateRay(const glm::ivec2& pixel_coord, const glm::vec2& offset = { 0.5,0.5 }) const;
 
 	Film& GetFilm() { return film; }

@@ -12,6 +12,7 @@
 #include "sphere.h"
 #include "model.h"
 #include"plane.h"
+#include "scene.h"
 #include "thread_pool.h"
 
 // =============================================================================
@@ -53,12 +54,16 @@ int main()
 	ThreadPool thread_pool{};
 
 	Film film{ 1920, 1080 };
-	Camera camera{ film, { -0.6, 0.1, 0}, { 0, 0, 0 }, 90.f };
+	Camera camera{ film, { -1.6, 0, 0}, { 0, 0, 0 }, 90.f };
 
 	Model model("models/simple_dragon.obj");
 	Sphere sphere{ { 0, 0, 0 }, .5f };
 	Plane plane{ {0,0,0},{0,1,0} };
-	Shape& shape = plane;
+
+	Scene scene{};
+	scene.AddShape(&model, { 0,0,0 }, { 1,3,2 });
+	scene.AddShape(&sphere,{0,0,1.5},{0.3,0.3,0.3});
+	scene.AddShape(&plane,{0,-0.5,0});
 	glm::vec3 light_pos{ -1, 2, 1 };
 
 	// --- 【跨线程共享】进度计数 ---
@@ -75,8 +80,12 @@ int main()
 				{
 					// ↓↓↓ 【Worker 线程】执行 ↓↓↓
 
+					// 相机输出【世界空间】射线
 					Ray ray = camera.GenerateRay({ x, y });
-					std::optional<HitInfo> hit = shape.Intersect(ray);
+
+					// 若 shape 是 Scene：内部会 将光线从【世界→模型】 求交，再把交点【模型→世界】返回
+					// 若 shape 是 Sphere/Plane 直接用：全程【世界空间】，无变换
+					std::optional<HitInfo> hit = scene.Intersect(ray);
 
 					if (hit.has_value())
 					{

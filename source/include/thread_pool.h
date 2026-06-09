@@ -7,10 +7,7 @@
 
 #include "spin_lock.h"
 
-// =============================================================================
-// Task — 任务基类
-// 继承并实现 run() 以定义具体任务逻辑
-// =============================================================================
+// 一个任务，线程池会调用 run()
 class Task
 {
 public:
@@ -18,44 +15,30 @@ public:
 	virtual ~Task() = default;
 };
 
-// =============================================================================
-// ThreadPool — 线程池
-// 固定数量工作线程 + 任务队列，支持自定义 Task 与 ParallelFor
-// =============================================================================
+// 线程池：维护一组工作线程和一个任务队列
 class ThreadPool
 {
 public:
-	// --- 生命周期 ---
-
-	/// @param thread_count 工作线程数；为 0 时自动使用 CPU 核心数
+	// thread_count 为 0 时，自动用 CPU 核心数
 	ThreadPool(size_t thread_count = 0);
 	~ThreadPool();
 
-	// --- 并行工具 ---
-
-	/// 对 [0, width) × [0, height) 的每个坐标提交一个并行任务
+	// 对 [0, width) x [0, height) 的每个坐标提交一个任务
 	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda);
-
-	// --- 任务队列 ---
 
 	void AddTask(Task* task);
 	Task* GetTask();
 
-	/// 阻塞主线程，直到线程池里所有任务都执行完毕。
-	/// ParallelFor 只是把任务丢进队列就返回，不会等 worker 画完像素；
-	/// Save 前必须 Wait，否则胶片可能还是空的或只画了一半。
+	// 等到队列里的任务全部做完
+	// ParallelFor 只是提交任务，不会在这里等它们真的跑完
 	void Wait() const;
-
-	// --- 工作线程 ---
 
 	static void WorkerThread(ThreadPool* master);
 
 private:
-	// --- 成员变量 ---
-
-	std::atomic<int> alive;                  // 1 = 运行中，0 = 请求退出
-	std::atomic<size_t> pending_task_count{ 0 };  // AddTask +1，worker run() -1；Wait 等到归零
+	std::atomic<int> alive;                  // 1 表示继续运行，0 表示准备退出
+	std::atomic<size_t> pending_task_count{ 0 };  // 还没做完的任务数
 	std::vector<std::thread> threads;       // 工作线程
-	std::queue<Task*> tasks;                // 任务队列
-	SpinLock spin_lock;                     // 保护 tasks 的并发访问
+	std::queue<Task*> tasks;                // 等待执行的任务
+	SpinLock spin_lock;                     // 保护任务队列
 };
