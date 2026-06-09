@@ -1,24 +1,17 @@
 #pragma once
 
-#include "shape.h"
+#include"ray.h"
+#include"shape.h"
+#include<optional>
 
-// =============================================================================
-// Sphere — 球体
-// =============================================================================
-class Sphere : public Shape
+struct Sphere :public Shape
 {
-public:
 	Sphere(const glm::vec3& center, float radius)
-		: center(center), radius(radius)
-	{
+		:center(center), radius(radius) {
 	}
+
+	virtual std::optional<HitInfo> Intersect(const Ray& ray, float t_min, float t_max)const override;
 
 	glm::vec3 center;
 	float radius;
-
-	std::optional<HitInfo> Intersect(
-		const Ray& ray,
-		float t_min = 1e-5f,
-		float t_max = std::numeric_limits<float>::infinity()
-	) const override;
 };

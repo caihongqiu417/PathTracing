@@ -10,6 +10,7 @@
 #include "hit_info.h"
 #include "shape.h"
 #include "sphere.h"
+#include "model.h"
 #include "thread_pool.h"
 
 // =============================================================================
@@ -50,10 +51,11 @@ int main()
 
 	ThreadPool thread_pool{};
 	Film film{ 1920, 1080 };
-	Camera camera{ film, { 0, 0, 1 }, { 0, 0, 0 }, 90.f };
+	Camera camera{ film, { -1, 0, 0}, { 0, 0, 0 }, 90.f };
+	Model model("models/simple_dragon.obj");
 	Sphere sphere{ { 0, 0, 0 }, .5f };
-	Shape& shape = sphere;  // 多态：后续可换成其它 Shape 子类
-	glm::vec3 light_pos{ 1, 1, 1 };
+	Shape& shape = model;  
+	glm::vec3 light_pos{ -1, 2, 1 };
 
 	// --- 【跨线程共享】进度计数 ---
 
