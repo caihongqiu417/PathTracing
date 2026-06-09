@@ -55,10 +55,10 @@ ThreadPool::~ThreadPool()
 // 同步
 // =============================================================================
 
-// 主线程在此空转等待，直到 tasks_remaining 变为 0（队列里的任务全部 run 完）
+// 主线程在此空转等待，直到 pending_task_count 变为 0（队列里的任务全部 run 完）
 void ThreadPool::Wait() const
 {
-	while (tasks_remaining.load(std::memory_order_acquire) > 0)
+	while (pending_task_count.load(std::memory_order_acquire) > 0)
 		std::this_thread::yield();
 }
 
@@ -75,7 +75,7 @@ void ThreadPool::WorkerThread(ThreadPool* master)
 		{
 			task->run();
 			delete task;
-			master->tasks_remaining.fetch_sub(1, std::memory_order_release);
+			master->pending_task_count.fetch_sub(1, std::memory_order_release);
 		}
 		else
 			std::this_thread::yield();
@@ -102,8 +102,8 @@ void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<v
 void ThreadPool::AddTask(Task* task)
 {
 	Guard guard{ spin_lock };
-	tasks.push_back(task);
-	tasks_remaining.fetch_add(1, std::memory_order_release);
+	tasks.push(task);  // 入队尾
+	pending_task_count.fetch_add(1, std::memory_order_release);
 }
 
 Task* ThreadPool::GetTask()
@@ -114,6 +114,6 @@ Task* ThreadPool::GetTask()
 		return nullptr;
 
 	Task* task = tasks.front();
-	tasks.pop_front();
+	tasks.pop();  // 出队头（先进先出）
 	return task;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <list>
+#include <queue>
 #include <thread>
 #include <vector>
 
@@ -54,8 +54,8 @@ private:
 	// --- 成员变量 ---
 
 	std::atomic<int> alive;                  // 1 = 运行中，0 = 请求退出
-	std::atomic<size_t> tasks_remaining{ 0 };  // AddTask +1，worker 执行完 -1；Wait 等到归零
-	std::vector<std::thread> threads; // 工作线程
-	std::list<Task*> tasks;           // 待执行的任务队列
-	SpinLock spin_lock;               // 保护 tasks 的并发访问
+	std::atomic<size_t> pending_task_count{ 0 };  // AddTask +1，worker run() -1；Wait 等到归零
+	std::vector<std::thread> threads;       // 工作线程
+	std::queue<Task*> tasks;                // 任务队列
+	SpinLock spin_lock;                     // 保护 tasks 的并发访问
 };
