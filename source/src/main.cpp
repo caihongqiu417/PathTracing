@@ -11,6 +11,7 @@
 #include "shape.h"
 #include "sphere.h"
 #include "model.h"
+#include"plane.h"
 #include "thread_pool.h"
 
 // =============================================================================
@@ -50,11 +51,14 @@ int main()
 	// --- 【主线程】场景初始化 ---
 
 	ThreadPool thread_pool{};
+
 	Film film{ 1920, 1080 };
-	Camera camera{ film, { -1, 0, 0}, { 0, 0, 0 }, 90.f };
+	Camera camera{ film, { -0.6, 0.1, 0}, { 0, 0, 0 }, 90.f };
+
 	Model model("models/simple_dragon.obj");
 	Sphere sphere{ { 0, 0, 0 }, .5f };
-	Shape& shape = model;  
+	Plane plane{ {0,0,0},{0,1,0} };
+	Shape& shape = plane;
 	glm::vec3 light_pos{ -1, 2, 1 };
 
 	// --- 【跨线程共享】进度计数 ---
