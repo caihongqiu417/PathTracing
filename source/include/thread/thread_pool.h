@@ -24,7 +24,10 @@ public:
 	~ThreadPool();
 
 	// 按块切图后提交任务，每个任务负责一片像素区域
-	// complexity: 任务复杂度 (0.1~1.0 轻任务，1.0~10.0 正常任务，>10.0 重任务)
+	// complexity: 任务复杂度
+	//   - 低 (0.1~0.5): 轻任务，像素计算量均匀 → 块大，任务少 → 减少队列开销
+	//   - 中 (1.0):    正常任务，计算量有差异 → 块中等
+	//   - 高 (2.0+):   重任务，计算量差异大 → 块小，任务多 → 快线程多干，慢线程少干 → 负载均衡
 	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda, float complexity = 1.0f);
 
 	// 入队。task 交给线程池，跑完后由 Worker delete
