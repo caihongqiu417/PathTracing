@@ -5,7 +5,7 @@
 
 // 把物体放进场景，并记下模型空间和世界空间怎么互转
 
-void Scene::AddShape(Shape* shape, const glm::vec3& pos, const glm::vec3& scale, const glm::vec3& rotate)
+void Scene::AddShape(const Shape& shape, const Material& material,const glm::vec3& pos, const glm::vec3& scale, const glm::vec3& rotate)
 {
 	// 模型里的点先在模型空间里
 	// 这个矩阵负责把它们放到世界空间里
@@ -18,6 +18,7 @@ void Scene::AddShape(Shape* shape, const glm::vec3& pos, const glm::vec3& scale,
 
 	instances.push_back(ShapeInstance{
 		shape,
+		material,
 		world_from_object,
 		glm::inverse(world_from_object)  // 反过来：世界空间 -> 模型空间
 	});
@@ -39,7 +40,7 @@ std::optional<HitInfo> Scene::Intersect(const Ray& ray, float t_min, float t_max
 		Ray ray_object = ray.WorldToObject(instance.object_from_world);
 
 		// 在模型空间里做求交
-		std::optional<HitInfo> hit = instance.shape->Intersect(ray_object, t_min, closest_t);
+		std::optional<HitInfo> hit = instance.shape.Intersect(ray_object, t_min, closest_t);
 		if (!hit.has_value())
 			continue;
 
@@ -55,7 +56,7 @@ std::optional<HitInfo> Scene::Intersect(const Ray& ray, float t_min, float t_max
 		glm::vec3 world_normal = glm::normalize(glm::vec3(
 			glm::transpose(instance.object_from_world) * glm::vec4(hit->normal, 0.f)));
 
-		closest = HitInfo{ world_t, world_point, world_normal };
+		closest = HitInfo{ world_t, world_point, world_normal, &instance.material };
 		closest_t = world_t;
 	}
 

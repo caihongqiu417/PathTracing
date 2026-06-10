@@ -1,5 +1,5 @@
 #include "film.h"
-
+#include"rgb.h"
 #include <fstream>
 
 // =============================================================================
@@ -28,14 +28,12 @@ void Film::Save(const std::filesystem::path& filename)
 	{
 		for (size_t x = 0; x < width; x++)
 		{
-			const glm::vec3& color = GetPixel(x, y);
+			//保存时把物理光照强度转换成RGB颜色以显示
+			RGB rgb(GetPixel(x, y));
 
-			// 浮点 [0, 1] → 整数 [0, 255]
-			glm::ivec3 color_i = glm::clamp(color * 255.f, 0.f, 255.f);
-
-			file.put(static_cast<uint8_t>(color_i.x));
-			file.put(static_cast<uint8_t>(color_i.y));
-			file.put(static_cast<uint8_t>(color_i.z));
+			file.put(static_cast<uint8_t>(rgb.r));
+			file.put(static_cast<uint8_t>(rgb.g));
+			file.put(static_cast<uint8_t>(rgb.b));
 		}
 	}
 }

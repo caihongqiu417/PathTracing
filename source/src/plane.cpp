@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+//射线与平面求交
 std::optional<HitInfo> Plane::Intersect(const Ray& ray, float t_min, float t_max) const
 {
 	const float denom = glm::dot(ray.direction, normal);

@@ -61,9 +61,9 @@ int main()
 	Plane plane{ {0,0,0},{0,1,0} };
 
 	Scene scene{};
-	scene.AddShape(&model, { 0,0,0 }, { 1,3,2 });
-	scene.AddShape(&sphere,{0,0,1.5},{0.3,0.3,0.3});
-	scene.AddShape(&plane,{0,-0.5,0});
+	scene.AddShape(model, {}, { 0, 0, 0 }, { 1,3,2 });
+	scene.AddShape(sphere,{},{0,0,1.5},{0.3,0.3,0.3});
+	scene.AddShape(plane,{},{0,-0.5,0});
 	glm::vec3 light_pos{ -1, 2, 1 };
 
 	// --- 【跨线程共享】进度计数 ---
@@ -80,20 +80,32 @@ int main()
 				{
 					// ↓↓↓ 【Worker 线程】执行 ↓↓↓
 
-					// 相机输出【世界空间】射线
+					// 最终反照率
+					glm::vec3 beta = { 1,1,1 };
+					glm::vec3 color = { 0,0,0 };
+
+					// 若 shape 是 Scene：内部会光线从世界空间转换到模型空间，然后与模型空间内的场景求交，再将交点转回世界空间
 					Ray ray = camera.GenerateRay({ x, y });
 
-					// 若 shape 是 Scene：内部会 将光线从【世界→模型】 求交，再把交点【模型→世界】返回
-					// 若 shape 是 Sphere/Plane 直接用：全程【世界空间】，无变换
-					std::optional<HitInfo> hit = scene.Intersect(ray);
-
-					if (hit.has_value())
+					while (true)
 					{
-						const HitInfo& hit_info = hit.value();
-						glm::vec3 L = glm::normalize(light_pos - hit_info.point);
-						float cosine = glm::max(0.f, glm::dot(hit_info.normal, L));
-						film.SetPixel(x, y, { cosine, cosine, cosine });
+						auto hit_info = scene.Intersect(ray);
+						if (hit_info.has_value())
+						{
+							//计算反射后的颜色
+							color += beta * hit_info->material->emissive;
+							//更新衰减率
+							beta *= hit_info->material->albedo;
+							//新光线的原点是交点
+							ray.origin = hit_info->point;
+							//TODO:ray.direction
+						}
+						else
+						{
+							break;
+						}
 					}
+					film.SetPixel(x, y, color);
 
 					pixels_done.fetch_add(1, std::memory_order_relaxed);
 				});
