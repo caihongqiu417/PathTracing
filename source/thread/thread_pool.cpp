@@ -1,19 +1,10 @@
-// =============================================================================
-// ThreadPool — 三类线程协作（与 main.cpp 配合）
-//
-//   【主线程】  创建 ThreadPool、Wait()、Save
-//   【入队线程】 main 里 std::thread 跑 ParallerlFor，只 AddTask
-//   【Worker】  本文件 WorkerThread，取队列任务并 run()
-// =============================================================================
-
 #include "thread_pool.h"
 
 #include <atomic>
 
-// =============================================================================
-// ParallelForTask — ParallelFor 的内部任务（仅本文件使用）
-// 保存坐标 (x, y) 和共享回调，run() 时在【Worker 线程】调用 lambda(x, y)
-// =============================================================================
+ThreadPool thread_pool{};
+
+// 并行循环里的单个任务
 class ParallelForTask : public Task
 {
 public:
@@ -32,10 +23,7 @@ private:
 	std::function<void(size_t, size_t)> lambda;
 };
 
-// =============================================================================
-// 生命周期 — 【主线程】构造时启动 Worker×N
-// =============================================================================
-
+// 构造 / 析构
 ThreadPool::ThreadPool(size_t thread_count)
 {
 	alive = 1;
@@ -59,19 +47,14 @@ ThreadPool::~ThreadPool()
 	threads.clear();
 }
 
-// =============================================================================
-// 同步 — 【主线程】Wait()：等 pending_task_count 归零
-// =============================================================================
+// 等任务跑完
 void ThreadPool::Wait() const
 {
 	while (pending_task_count.load(std::memory_order_acquire) > 0)
 		std::this_thread::yield();
 }
 
-// =============================================================================
-// Worker 线程 — 循环取任务、执行 run()、pending_task_count--
-// =============================================================================
-
+// 工作线程
 void ThreadPool::WorkerThread(ThreadPool* master)
 {
 	while (master->alive == 1)
@@ -88,10 +71,7 @@ void ThreadPool::WorkerThread(ThreadPool* master)
 	}
 }
 
-// =============================================================================
-// 并行工具 — 【入队线程】调用：只创建 Task 并 AddTask，不跑 lambda
-// =============================================================================
-
+// 提交二维网格任务
 void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda)
 {
 	for (size_t y = 0; y < height; y++)
@@ -101,10 +81,7 @@ void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<v
 	}
 }
 
-// =============================================================================
-// 任务队列 — 【入队线程】AddTask / 【Worker】GetTask
-// =============================================================================
-
+// 任务队列
 void ThreadPool::AddTask(Task* task)
 {
 	Guard guard{ spin_lock };

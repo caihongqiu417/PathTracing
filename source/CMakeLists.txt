@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 file(GLOB source_main CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 file(GLOB source_camera CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/camera/*.cpp")
 file(GLOB source_shape CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shape/*.cpp")
+file(GLOB source_renderer CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/*.cpp")
 file(GLOB source_thread CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/thread/*.cpp")
 file(GLOB source_util CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/util/*.cpp")
 
@@ -11,6 +12,7 @@ set(source
 	${source_main}
 	${source_camera}
 	${source_shape}
+	${source_renderer}
 	${source_thread}
 	${source_util}
 )
@@ -18,6 +20,7 @@ set(source
 add_executable(PathTracing ${source})
 
 target_include_directories(PathTracing PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}
 	include
 	include/camera
 	include/shape
