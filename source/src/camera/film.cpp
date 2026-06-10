@@ -19,7 +19,7 @@ void Film::Save(const std::filesystem::path& filename)
     // 预分配缓冲区（RGB 三个通道）
     std::vector<uint8_t> buffer(width * height * 3);
 
-    // 并行处理所有像素
+    // 并行处理所有像素（complexity=0.2 表示操作很轻，用更大的块减少线程开销）
     thread_pool.ParallerlFor(width, height, [&](size_t x, size_t y)
     {
         auto pixel = GetPixel(x, y);
@@ -34,7 +34,7 @@ void Film::Save(const std::filesystem::path& filename)
         buffer[idx]     = static_cast<uint8_t>(rgb.r);
         buffer[idx + 1] = static_cast<uint8_t>(rgb.g);
         buffer[idx + 2] = static_cast<uint8_t>(rgb.b);
-    });
+    }, 0.2f);
 
     // 等待所有任务完成
     thread_pool.Wait();

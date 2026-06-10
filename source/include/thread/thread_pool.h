@@ -24,7 +24,8 @@ public:
 	~ThreadPool();
 
 	// 按块切图后提交任务，每个任务负责一片像素区域
-	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda);
+	// complexity: 任务复杂度 (0.1~1.0 轻任务，1.0~10.0 正常任务，>10.0 重任务)
+	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda, float complexity = 1.0f);
 
 	// 入队。task 交给线程池，跑完后由 Worker delete
 	void AddTask(Task* task);

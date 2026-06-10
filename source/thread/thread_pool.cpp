@@ -102,13 +102,14 @@ void ThreadPool::WorkerThread(ThreadPool* master)
 }
 
 // 提交二维网格任务
-void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda)
+void ThreadPool::ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda, float complexity)
 {
-	// 按块切图，一个任务管一片区域，别碎到“一像素一任务”。
+	// 按块切图，一个任务管一片区域，别碎到”一像素一任务”。
 	// 线程越多，块越小，任务越多，更容易把活分匀。
+	// complexity 低的任务用更大的块（减少线程开销），高的用更小的块（提高并行度）。
 	const float thread_scale = std::sqrt(static_cast<float>(threads.size()));
-	float chunk_width_float = static_cast<float>(width) / std::sqrt(16.f) / thread_scale;
-	float chunk_height_float = static_cast<float>(height) / std::sqrt(16.f) / thread_scale;
+	float chunk_width_float = static_cast<float>(width) / std::sqrt(16.f) / thread_scale / complexity;
+	float chunk_height_float = static_cast<float>(height) / std::sqrt(16.f) / thread_scale / complexity;
 	size_t chunk_width = static_cast<size_t>(std::ceil(chunk_width_float));
 	size_t chunk_height = static_cast<size_t>(std::ceil(chunk_height_float));
 

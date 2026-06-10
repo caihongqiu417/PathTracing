@@ -1,21 +1,25 @@
-# Ö¸¶¨¹¹½¨±¾ÏîÄ¿ËùÐèµÄ×îµÍ CMake °æ±¾Îª 3.7
-# Èç¹ûµ±Ç° CMake °æ±¾µÍÓÚ 3.7£¬»á±¨´í²¢Í£Ö¹ÔËÐÐ
+# Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CMake ï¿½æ±¾Îª 3.7
+# ï¿½ï¿½ï¿½ï¿½ï¿½Ç° CMake ï¿½æ±¾ï¿½ï¿½ï¿½ï¿½ 3.7ï¿½ï¿½ï¿½á±¨ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½
 cmake_minimum_required(VERSION 3.14)
 
-# ¶¨ÒåÏîÄ¿Ãû³ÆÎª PathTracing
-# ²¢ÉùÃ÷ÏîÄ¿Ê¹ÓÃ C++ ÓïÑÔ£¨LANGUAGES CXX£©
-# CXX ÊÇ CMake ÖÐ¶Ô C++ µÄ±êÊ¶·û
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½Îª PathTracing
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Ê¹ï¿½ï¿½ C++ ï¿½ï¿½ï¿½Ô£ï¿½LANGUAGES CXXï¿½ï¿½
+# CXX ï¿½ï¿½ CMake ï¿½Ð¶ï¿½ C++ ï¿½Ä±ï¿½Ê¶ï¿½ï¿½
 project(
 	PathTracing
 	LANGUAGES CXX
 )
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+	set(CMAKE_CONFIGURATION_TYPES Release CACHE STRING "Config types" FORCE)
+endif()
 set(CMAKE_BUILD_TYPE Release)
 
-# Ìí¼Ó×ÓÄ¿Â¼ source£¬ÈÃ CMake ´¦Àí source ÎÄ¼þ¼ÐÀïµÄ CMakeLists.txt
-# Í¨³£¸ÃÎÄ¼þ¼Ð´æ·ÅÏîÄ¿µÄºËÐÄÔ´´úÂë
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ sourceï¿½ï¿½ï¿½ï¿½ CMake ï¿½ï¿½ï¿½ï¿½ source ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CMakeLists.txt
+# Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½Äºï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½
 add_subdirectory(source)
 
-# Ìí¼Ó×ÓÄ¿Â¼ thirdparty£¬ÈÃ CMake ´¦Àí thirdparty ÎÄ¼þ¼ÐÀïµÄ CMakeLists.txt
-# Í¨³£¸ÃÎÄ¼þ¼Ð´æ·ÅµÚÈý·½ÒÀÀµ¿â£¨Èç glm, stb_image, tinyobjloader µÈ£©
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ thirdpartyï¿½ï¿½ï¿½ï¿½ CMake ï¿½ï¿½ï¿½ï¿½ thirdparty ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CMakeLists.txt
+# Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½Ð´ï¿½Åµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â£¨ï¿½ï¿½ glm, stb_image, tinyobjloader ï¿½È£ï¿½
 add_subdirectory(thirdparty)

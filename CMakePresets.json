@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "vendor": {
+    "microsoft.com/VisualStudio/CMakeSettings": "https://aka.ms/cmake/presets/v3"
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default build using Visual Studio 17 2022",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "binaryDir": "${sourceDir}/build"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "configurePreset": "default",
+      "configuration": "Release",
+      "targets": ["ALL_BUILD"]
+    }
+  ]
+}
