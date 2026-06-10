@@ -26,14 +26,18 @@ void Film::Save(const std::filesystem::path& filename)
 	// 逐像素写入 RGB 字节
 	for (size_t y = 0; y < height; y++)
 	{
-		for (size_t x = 0; x < width; x++)
-		{
-			//保存时把物理光照强度转换成RGB颜色以显示
-			RGB rgb(GetPixel(x, y));
+	   for (size_t x = 0; x < width; x++)
+	   {
+	       auto pixel = GetPixel(x, y);
+	       
+	       // 保存时把物理光照强度转换成 RGB 颜色以显示
+	       // 计算平均值：累加的颜色 / 采样次数
+	       RGB rgb(pixel.color / static_cast<float>(pixel.sample_count));
 
-			file.put(static_cast<uint8_t>(rgb.r));
-			file.put(static_cast<uint8_t>(rgb.g));
-			file.put(static_cast<uint8_t>(rgb.b));
-		}
+	       // 写入 R、G、B 三个字节（每个分量 0-255）
+	       file.put(static_cast<uint8_t>(rgb.r));
+	       file.put(static_cast<uint8_t>(rgb.g));
+	       file.put(static_cast<uint8_t>(rgb.b));
+	   }
 	}
 }
