@@ -1,78 +1,64 @@
 #include "model.h"
-#include<fstream>
-#include<iostream>
-#include<sstream>
+#include <rapidobj/rapidobj.hpp>
+#include <iostream>
 
 // 加载 OBJ
 Model::Model(const std::filesystem::path& filename)
 {
-    // 顶点和法线先存在模型空间里。
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec3> normals;
+    auto result = rapidobj::ParseFile(filename);
 
-    // 打开文件
-    std::ifstream file{ filename };
-    if (!file.good())
+    if (result.error)
     {
         std::cout << "打开文件失败！" << std::endl;
         return;
     }
 
-    std::string line;
-    char trash;  // 用来跳过 v、f、/
+    rapidobj::Triangulate(result);
 
-    // 逐行解析
-    while (std::getline(file, line))
+    const auto& positions = result.attributes.positions;
+    const auto& normals = result.attributes.normals;
+
+    for (const auto& shape : result.shapes)
     {
-        std::istringstream iss(line);
-
-        // 顶点
-        if (line.compare(0, 2, "v ") == 0)
+        const auto& indices = shape.mesh.indices;
+        for (size_t i = 0; i < indices.size(); i += 3)
         {
-            glm::vec3 position;
-            iss >> trash >> position.x >> position.y >> position.z;
-            positions.push_back(position);
-        }
-        // 法线
-        else if (line.compare(0, 3, "vn ") == 0)
-        {
-            glm::vec3 normal;
-            iss >> trash >> trash >> normal.x >> normal.y >> normal.z;
-            normals.push_back(normal);
-        }
-        // 三角形
-        else if (line.compare(0, 2, "f ") == 0)
-        {
-            glm::ivec3 idx_v;
-            glm::ivec3 idx_vn;
+            glm::vec3 p0{ positions[indices[i].position_index * 3],
+                         positions[indices[i].position_index * 3 + 1],
+                         positions[indices[i].position_index * 3 + 2] };
+            glm::vec3 p1{ positions[indices[i + 1].position_index * 3],
+                         positions[indices[i + 1].position_index * 3 + 1],
+                         positions[indices[i + 1].position_index * 3 + 2] };
+            glm::vec3 p2{ positions[indices[i + 2].position_index * 3],
+                         positions[indices[i + 2].position_index * 3 + 1],
+                         positions[indices[i + 2].position_index * 3 + 2] };
 
-            iss >> trash;
+            glm::vec3 n0{ normals[indices[i].normal_index * 3],
+                         normals[indices[i].normal_index * 3 + 1],
+                         normals[indices[i].normal_index * 3 + 2] };
+            glm::vec3 n1{ normals[indices[i + 1].normal_index * 3],
+                         normals[indices[i + 1].normal_index * 3 + 1],
+                         normals[indices[i + 1].normal_index * 3 + 2] };
+            glm::vec3 n2{ normals[indices[i + 2].normal_index * 3],
+                         normals[indices[i + 2].normal_index * 3 + 1],
+                         normals[indices[i + 2].normal_index * 3 + 2] };
 
-            iss >> idx_v.x >> trash >> trash >> idx_vn.x;
-            iss >> idx_v.y >> trash >> trash >> idx_vn.y;
-            iss >> idx_v.z >> trash >> trash >> idx_vn.z;
-
-            // OBJ 下标从 1 开始
-            if (idx_v.x <= positions.size() && idx_v.y <= positions.size() && idx_v.z <= positions.size() &&
-                idx_vn.x <= normals.size() && idx_vn.y <= normals.size() && idx_vn.z <= normals.size())
-            {
-                triangles.push_back(Triangle(
-                    positions[idx_v.x - 1], 
-                    positions[idx_v.y - 1], 
-                    positions[idx_v.z - 1],
-                    normals[idx_vn.x - 1], 
-                    normals[idx_vn.y - 1], 
-                    normals[idx_vn.z - 1]
-                ));
-            }
+            triangles.push_back(Triangle(p0, p1, p2, n0, n1, n2));
         }
     }
+
+    Build();
 }
 
 // 取最近的交点
 std::optional<HitInfo> Model::Intersect(const Ray& ray, float t_min, float t_max) const
 {
-	std::optional<HitInfo> closest;
+    //和AABB相交测试
+    if (!bounds.HasIntersection(ray, t_min, t_max))
+        return{};
+
+    //交点信息
+    std::optional<HitInfo> closest;
 	float closest_t = t_max;
 
 	for (const Triangle& tri : triangles)
@@ -86,4 +72,16 @@ std::optional<HitInfo> Model::Intersect(const Ray& ray, float t_min, float t_max
 	}
 
 	return closest;
+}
+
+void Model::Build()
+{
+    //遍历所有三角形
+    for (const auto& triangle : triangles)
+    {
+        //让包围盒包括三角形
+        bounds.Expand(triangle.p0);
+        bounds.Expand(triangle.p1);
+        bounds.Expand(triangle.p2);
+    }
 }
