@@ -23,5 +23,7 @@ public:
 
 private:
 	size_t width, height;
+
+	//假设胶片存储的是物理意义上的光照强度
 	std::vector<glm::vec3> pixels;  // 按行存，索引 = y * width + x
 };

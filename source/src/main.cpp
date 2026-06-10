@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <random>
 #include <thread>
 
 #include <glm/glm.hpp>
@@ -13,6 +14,8 @@
 #include "model.h"
 #include"plane.h"
 #include "scene.h"
+#include"frame.h"
+#include"rgb.h"
 #include "thread_pool.h"
 
 // =============================================================================
@@ -49,12 +52,15 @@ static void PrintRenderProgress(size_t done, size_t total)
 
 int main()
 {
+	constexpr int max_bounces = 8;
+	constexpr float ray_origin_bias = 1e-4f;
+
 	// --- 【主线程】场景初始化 ---
 
 	ThreadPool thread_pool{};
 
 	Film film{ 1920, 1080 };
-	Camera camera{ film, { -1.6, 0, 0}, { 0, 0, 0 }, 90.f };
+	Camera camera{ film, { -3.6, 0, 0}, { 0, 0, 0 }, 45.f };
 
 	Model model("models/simple_dragon.obj");
 	Sphere sphere{ { 0, 0, 0 }, .5f };
@@ -62,8 +68,25 @@ int main()
 
 	Scene scene{};
 	scene.AddShape(model, {}, { 0, 0, 0 }, { 1,3,2 });
-	scene.AddShape(sphere,{},{0,0,1.5},{0.3,0.3,0.3});
-	scene.AddShape(plane,{},{0,-0.5,0});
+	scene.AddShape(
+		sphere,
+		{ { 1, 1, 1 }, false, RGB(255, 128, 128) },
+		{ 0, 0, 2.5 }
+	);
+
+	scene.AddShape(
+	    sphere,
+	    { { 1, 1, 1 }, false, RGB(128, 128, 255) },
+	    { 0, 0, -2.5 }
+	);
+
+	scene.AddShape(
+		sphere,
+		{ { 1, 1, 1 }, true },
+		{ 3, 0.5, -2}
+	);
+
+	scene.AddShape(plane,{{1,1,1},false,RGB{128,128,255}},{0,-0.5,0});
 	glm::vec3 light_pos{ -1, 2, 1 };
 
 	// --- 【跨线程共享】进度计数 ---
@@ -80,6 +103,10 @@ int main()
 				{
 					// ↓↓↓ 【Worker 线程】执行 ↓↓↓
 
+					// 每个像素使用独立随机数引擎，避免多个线程共享同一个 mt19937。
+					std::mt19937 gen(static_cast<std::mt19937::result_type>(23451334u + y * film.GetWidth() + x));
+					std::uniform_real_distribution<float> uniform(-1.f, 1.f);
+
 					// 最终反照率
 					glm::vec3 beta = { 1,1,1 };
 					glm::vec3 color = { 0,0,0 };
@@ -87,18 +114,42 @@ int main()
 					// 若 shape 是 Scene：内部会光线从世界空间转换到模型空间，然后与模型空间内的场景求交，再将交点转回世界空间
 					Ray ray = camera.GenerateRay({ x, y });
 
-					while (true)
+					// 限制最大反弹次数，避免少数光线在场景里长时间循环导致进度卡住。
+					for (int bounce = 0; bounce < max_bounces; ++bounce)
 					{
 						auto hit_info = scene.Intersect(ray);
 						if (hit_info.has_value())
 						{
-							//计算反射后的颜色
-							color += beta * hit_info->material->emissive;
-							//更新衰减率
-							beta *= hit_info->material->albedo;
-							//新光线的原点是交点
-							ray.origin = hit_info->point;
-							//TODO:ray.direction
+							//--- 计算颜色 ---
+							
+							color += beta * hit_info->material->emissive;//计算反射后的颜色
+							
+							beta *= hit_info->material->albedo;//更新衰减率
+
+							//--- 计算反射后的方向 ---
+							// 沿法线稍微抬起一点，避免新射线立刻再次命中当前表面。
+							ray.origin = hit_info->point + hit_info->normal * ray_origin_bias;
+							
+							Frame frame(hit_info->normal);//构建TBN矩阵
+
+							glm::vec3 light_direction;
+							if (hit_info->material->is_specular/*1.镜面反射*/)
+							{
+								//将射线取反，然后绕y轴转180°=>得到反射光方向
+								glm::vec3 view_direction = frame.LocalFromWorld(-ray.direction);
+								light_direction = { -view_direction.x,view_direction.y,-view_direction.z };
+							}
+							else {/*2.漫反射*/
+								do {
+									//拒绝采样:生成半球上的反射光方向
+									light_direction = glm::vec3(uniform(gen), uniform(gen), uniform(gen));
+								} while (glm::length(light_direction) > 1);
+								if (light_direction.y < 0) {
+									light_direction.y = -light_direction.y;
+								}
+							}
+							//将局部空间内的反射光方向转换到世界坐标系
+							ray.direction = frame.WorldFromLocal(light_direction);
 						}
 						else
 						{
