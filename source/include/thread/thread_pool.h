@@ -23,10 +23,10 @@ public:
 	ThreadPool(size_t thread_count = 0);
 	~ThreadPool();
 
-	// 给整张二维网格提交任务
+	// 按块切图后提交任务，每个任务负责一片像素区域
 	void ParallerlFor(size_t width, size_t height, const std::function<void(size_t, size_t)>& lambda);
 
-	// 手动加任务 / 取任务
+	// 入队。task 交给线程池，跑完后由 Worker delete
 	void AddTask(Task* task);
 	Task* GetTask();
 
