@@ -14,8 +14,8 @@
 
 int main()
 {
-	constexpr size_t width = 192;
-	constexpr size_t height = 108;
+	constexpr size_t width = 1920;
+	constexpr size_t height = 1080;
 	constexpr size_t spp = 16;
 
 	// 场景

@@ -4,6 +4,7 @@
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.generator": "Visual Studio 17 2022",
     "cmake.platform": "x64",
+    "cmake.buildType": "Release",
     "cmake.preferredGenerators": [
         "Visual Studio 17 2022"
     ],

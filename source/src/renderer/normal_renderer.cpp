@@ -2,7 +2,7 @@
 
 glm::vec3 NormalRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 {
-	// 主光线。抖动也在这里。
+	// 主光线。抖动
 	auto ray = camera.GenerateRay(pixel_coord, rng.PixelOffset());
 	auto hit_info = scene.Intersect(ray);
 	if (hit_info.has_value())

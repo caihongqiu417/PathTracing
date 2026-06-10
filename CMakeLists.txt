@@ -10,6 +10,8 @@ project(
 	LANGUAGES CXX
 )
 
+set(CMAKE_BUILD_TYPE Release)
+
 # 添加子目录 source，让 CMake 处理 source 文件夹里的 CMakeLists.txt
 # 通常该文件夹存放项目的核心源代码
 add_subdirectory(source)
