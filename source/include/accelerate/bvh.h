@@ -13,7 +13,9 @@ struct BVHTreeNode
 	std::vector<Triangle> triangles;
 
 	//左右孩子BVH节点
-	BVHTreeNode* children[2] = {nullptr, nullptr};
+	BVHTreeNode* children[2] = { nullptr, nullptr };
+
+	size_t depth;
 
 	//遍历这个节点的所有三角形并更新节点的包围盒
 	void UpdateBounds()
@@ -43,7 +45,8 @@ struct alignas(32) BVHNode
 		int triangle_index;
 	};
 	
-	int triangle_count;
+	uint16_t triangle_count;
+	uint8_t depth;
 
 };
 

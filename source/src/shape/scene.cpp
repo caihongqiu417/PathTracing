@@ -56,7 +56,11 @@ std::optional<HitInfo> Scene::Intersect(const Ray& ray, float t_min, float t_max
 		glm::vec3 world_normal = glm::normalize(glm::vec3(
 			glm::transpose(instance.object_from_world) * glm::vec4(hit->normal, 0.f)));
 
-		closest = HitInfo{ world_t, world_point, world_normal, &instance.material };
+		hit->t = world_t;
+		hit->point = world_point;
+		hit->normal = world_normal;
+		hit->material = &instance.material;
+		closest = hit;
 		closest_t = world_t;
 	}
 

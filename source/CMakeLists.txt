@@ -32,7 +32,7 @@ target_include_directories(PathTracing PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/rapidobj/include
 )
 target_compile_definitions(PathTracing PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_FORCE_LEFT_HANDED)
-
+target_compile_definitions(PathTracing PUBLIC WITH_DEBUG_INFO)
 target_link_libraries(PathTracing PRIVATE glm::glm)
 
 if(MSVC)

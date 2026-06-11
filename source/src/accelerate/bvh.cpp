@@ -1,5 +1,7 @@
 #include "bvh.h"
+#include"debug_macro.h"
 #include<array>
+
 
 //===========================================================================================
 // 构建BVH
@@ -16,6 +18,10 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 	auto root = new BVHTreeNode{};
 	root->triangles = std::move(triangles);
 	root->UpdateBounds();
+
+	//根节点深度设置为1
+	root->depth = 1;
+
 	RecursiveSplit(root);
 	
 	//BVH树结构=>BVH线性结构
@@ -27,7 +33,7 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 void BVH::RecursiveSplit(BVHTreeNode* node)
 {
 	//递归出口
-	if (node->triangles.size() == 1)
+	if (node->triangles.size() == 1||node->depth>32)
 		return;
 
 	//找到包围盒最长的轴
@@ -73,6 +79,10 @@ void BVH::RecursiveSplit(BVHTreeNode* node)
 	node->triangles.clear();			//清空当前节点的三角形！
 	node->triangles.shrink_to_fit();
 
+	//记录子节点深度（根节点+1）
+	child0->depth = node->depth + 1;
+	child1->depth = node->depth + 1;
+
 	child0->triangles = std::move(child0_triangles);
 	child1->triangles = std::move(child1_triangles);
 
@@ -95,6 +105,8 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 
 	std::optional<HitInfo> closest_hit_info;
 
+	DEBUG_LINE(size_t bounds_test_count = 0, triangle_test_count = 0;)	
+
 
 	//栈：代表待办节点
 	std::array<int, 32> stack;
@@ -106,7 +118,8 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 	while (true)
 	{
 		auto& node = nodes[current_node_index];
-
+		
+		DEBUG_LINE(bounds_test_count++;)
 
 		// -- a.如果光线和当前节点没有交点 --
 		if (!node.bounds.HasIntersection(ray, t_min, t_max))
@@ -128,11 +141,12 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 		{
 			//b2 叶子节点： 遍历叶子节点中的三角形，寻找交点
 			auto triangle_iter = ordered_triangles.begin() + node.triangle_index;  
+			DEBUG_LINE(triangle_test_count += node.triangle_count;)
 			for (size_t i = 0;i < node.triangle_count;i++)  //循环遍历这个节点的所有三角形
-
 			{
 				//检查迭代器对应的三角形与光线是否相交
 				auto hit_info = triangle_iter->Intersect(ray, t_min, t_max);
+
 
 				//迭代器往后移一位（指向下一个三角形）
 				++triangle_iter;
@@ -141,11 +155,18 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 				{
 					t_max = hit_info->t;
 					closest_hit_info = hit_info;
+					
+					DEBUG_LINE(closest_hit_info->bounds_depth = node.depth;)	
 				}
 			}
 			if (ptr == stack.begin()) break; //栈空：没有待办节点=>退出循环
 			current_node_index = *(--ptr);   //栈不空：处理下一个待办节点=>下一轮循环
 		}
+	}
+	if (closest_hit_info.has_value())
+	{
+		DEBUG_LINE(closest_hit_info->bounds_test_count=bounds_test_count;)
+		DEBUG_LINE(closest_hit_info->triangle_test_count=triangle_test_count;)
 	}
 
 	return closest_hit_info;
@@ -158,9 +179,10 @@ size_t BVH::RecursiveFlatten(BVHTreeNode* node)
 {
 	// 创建当前节点的线性节点
 	BVHNode bvh_node{
-		node->bounds,
-		0,
-		static_cast<int>(node->triangles.size())
+		node->bounds,									// AABB
+		0,												// Union(内部：右孩子索引/叶子：三角形索引)
+		static_cast<uint16_t>(node->triangles.size()), 	// 三角形数量
+		static_cast<uint8_t>(node->depth)				// 对应原先BVH树的深度
 	};
 	
 

@@ -1,50 +1,56 @@
 #include "renderer/rt_renderer.h"
 
 #include "util/frame.h"
+#include "renderer/rt_renderer.h"
+#include "util/frame.h"
 
 glm::vec3 RTRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 {
-	constexpr int max_bounces = 8;
-	constexpr float ray_origin_bias = 1e-4f;
+    //==============================
+    // 初始化
+    //==============================
+    constexpr int max_bounces = 8;          // 最大反弹次数
+    constexpr float ray_origin_bias = 1e-4f;// 避免自相交的偏移量
 
-	// 当前样本的颜色
-	glm::vec3 beta = { 1.f, 1.f, 1.f };
-	glm::vec3 color = { 0.f, 0.f, 0.f };
+    glm::vec3 beta = { 1.f, 1.f, 1.f };     // 路径衰减系数
+    glm::vec3 color = { 0.f, 0.f, 0.f };    // 累积颜色
 
-	// 主光线。抖动
-	Ray ray = camera.GenerateRay(pixel_coord, rng.PixelOffset());
+    // 生成主光线（带抖动抗锯齿）
+    Ray ray = camera.GenerateRay(pixel_coord, rng.PixelOffset());
 
-	// 路径反弹
-	for (int bounce = 0; bounce < max_bounces; ++bounce)
-	{
-		auto hit_info = scene.Intersect(ray);
-		if (!hit_info.has_value())
-			break;
+    //==============================
+    // 路径追踪
+    //==============================
+    for (int bounce = 0; bounce < max_bounces; ++bounce)
+    {
+        // 1. 求交
+        auto hit_info = scene.Intersect(ray);
+        if (!hit_info.has_value()) break;
 
-		// 累加这一跳的发光。
-		color += beta * hit_info->material->emissive;
-		beta *= hit_info->material->albedo;
+        // 2. 累积贡献
+        color += beta * hit_info->material->emissive;   // 加自发光
+        beta *= hit_info->material->albedo;             // 乘反射率
 
-		// 新光线从表面上方一点点出发。
-		ray.origin = hit_info->point + hit_info->normal * ray_origin_bias;
+        // 3. 生成新光线
+        ray.origin = hit_info->point + hit_info->normal * ray_origin_bias;  // 新起点
 
-		Frame frame(hit_info->normal);
-		glm::vec3 light_direction;
-		if (hit_info->material->is_specular)
-		{
-			// 镜面反射
-			glm::vec3 view_direction = frame.LocalFromWorld(-ray.direction);
-			light_direction = { -view_direction.x, view_direction.y, -view_direction.z };
-		}
-		else
-		{
-			// 漫反射
-			light_direction = rng.SampleHemisphere();
-		}
+        Frame frame(hit_info->normal);                  // 局部坐标系
+        glm::vec3 light_direction;
 
-		// 转回世界空间
-		ray.direction = frame.WorldFromLocal(light_direction);
-	}
+        if (hit_info->material->is_specular)
+        {
+            // 镜面反射
+            glm::vec3 view_direction = frame.LocalFromWorld(-ray.direction);
+            light_direction = { -view_direction.x, view_direction.y, -view_direction.z };
+        }
+        else
+        {
+            // 漫反射（半球采样）
+            light_direction = rng.SampleHemisphere();
+        }
 
-	return color;
+        ray.direction = frame.WorldFromLocal(light_direction);  // 新方向
+    }
+
+    return color;
 }

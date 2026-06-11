@@ -10,4 +10,23 @@ struct HitInfo
 	glm::vec3 point;      // 交点，使用世界空间
 	glm::vec3 normal;     // 交点处的法线，使用世界空间
 	const Material* material = nullptr; //交点所对应物体的材质
+
+	//调试信息
+	#ifdef WITH_DEBUG_INFO
+		size_t bounds_test_count = 0;
+		size_t triangle_test_count = 0;
+		size_t bounds_depth = 0; 			
+	#endif
+
+	// 当找到一条光线与表面的交点时
+	//HitInfo hit = bvh.Intersect(ray);
+
+	// debug_info 记录的是：
+	// 为了找到这个交点，BVH做了多少工作
+
+	// hit.bounds_test_count    = 100    // 检测了100个包围盒
+	// hit.triangle_test_count  = 50     // 检测了50个三角形
+	// hit.bounds_depth         = 15     // 遍历了15层BVH树
 };
+
+
