@@ -3,7 +3,7 @@
 #include"camera/ray.h"
 #include<glm/glm.hpp>
 
-// 轴对齐包围盒 (AABB - Axis Aligned Bounding Box)
+// 轴对齐包围盒AABB
 // 由最小点(b_min)和最大点(b_max)定义的一个长方体
 struct Bounds
 {
@@ -12,14 +12,13 @@ struct Bounds
     }
     
 	// 构造函数：传入包围盒的两个对角顶点
-    // b_min - 最小点（左下后角）
-    // b_max - 最大点（右上前角）
+    // b_min - 最小点
+    // b_max - 最大点
     Bounds(const glm::vec3& b_min, const glm::vec3& b_max)
         : b_min(b_min), b_max(b_max) {
     }
 
     // 扩展包围盒，使其包含新点
-    // 如果新点在包围盒外，就扩大边界
     void Expand(const glm::vec3& pos)
     {
         b_min = glm::min(pos, b_min);  // 更新最小边界
@@ -32,6 +31,9 @@ struct Bounds
     // t_max - 最大检测距离
     bool HasIntersection(const Ray& ray, float t_min, float t_max) const;
 
-    glm::vec3 b_min;  // 最小点：左、下、后边界 (x_min, y_min, z_min)
-    glm::vec3 b_max;  // 最大点：右、上、前边界 (x_max, y_max, z_max)
+    //获取包围盒的对角线
+    glm::vec3 Diagonal()const { return b_max - b_min; }
+
+    glm::vec3 b_min;  // 最小点
+    glm::vec3 b_max;  // 最大点
 };
