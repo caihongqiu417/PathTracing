@@ -1,5 +1,20 @@
 #include "bvh.h"
 
+BVH::~BVH()
+{
+	DeleteNode(root);
+}
+
+void BVH::DeleteNode(BVHNode* node)
+{
+	if (!node)
+		return;
+
+	DeleteNode(node->children[0]);
+	DeleteNode(node->children[1]);
+	delete node;
+}
+
 //===========================================================================================
 // 构建BVH
 // 功能：将输入的三角形列表组织成BVH树结构，加速光线追踪查询
@@ -98,7 +113,7 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 	return closest_hit_info;
 }
 
-void BVH::RecursiveIntersect(BVHNode* node, const Ray& ray, float t_min, float t_max, std::optional<HitInfo>& closest_hit_info) const
+void BVH::RecursiveIntersect(BVHNode* node, const Ray& ray, float t_min, float& t_max, std::optional<HitInfo>& closest_hit_info) const
 {
 	//判断和当前节点的包围盒是否有交点
 	if (!node->bounds.HasIntersection(ray, t_min, t_max))
