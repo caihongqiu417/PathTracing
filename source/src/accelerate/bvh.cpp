@@ -157,13 +157,12 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 size_t BVH::RecursiveFlatten(BVHTreeNode* node)
 {
 	// 创建当前节点的线性节点
-	BVHNode bvh_node
-	{
-		node->bounds,                  // 1. 包围盒：直接从树节点复制
-		0,                             // 2. 右孩子索引：暂时为0，递归回溯时设置
-		0,                             // 3. 三角形起始位置：指向全局三角形数组的位置
-		node->triangles.size()         // 4. 三角形数量：用于遍历三角形范围
+	BVHNode bvh_node{
+		node->bounds,
+		0,
+		static_cast<int>(node->triangles.size())
 	};
+	
 
 	// 记录当前节点在数组中的位置
 	auto idx = nodes.size();               // 数组末尾 = 这个节点的位置

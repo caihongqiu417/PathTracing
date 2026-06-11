@@ -29,19 +29,21 @@ struct BVHTreeNode
 };
 
 //	BVH数组的节点
-struct BVHNode
+struct alignas(32) BVHNode
 {
 	//包围盒
 	Bounds bounds{};
+
+	union
+	{
+		//右孩子索引（内部节点用）
+		int child1_index;
+
+		//三角形索引（叶子节点用)
+		int triangle_index;
+	};
 	
-	//右孩子索引
-	size_t child1_index;
-
-	//三角形索引
-	size_t triangle_index;
-
-	//三角形数量
-	size_t triangle_count;
+	int triangle_count;
 
 };
 
