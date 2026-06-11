@@ -4,7 +4,7 @@
 #include"shape/triangle.h"
 
 /// @brief BVH树的一个节点
-struct BVHNode
+struct BVHTreeNode
 {
 	//AABB包围盒
 	Bounds bounds{};
@@ -13,7 +13,7 @@ struct BVHNode
 	std::vector<Triangle> triangles;
 
 	//左右孩子BVH节点
-	BVHNode* children[2] = {nullptr, nullptr};
+	BVHTreeNode* children[2] = {nullptr, nullptr};
 
 	//遍历这个节点的所有三角形并更新节点的包围盒
 	void UpdateBounds()
@@ -28,13 +28,27 @@ struct BVHNode
 	}
 };
 
+//	BVH数组的节点
+struct BVHNode
+{
+	//包围盒
+	Bounds bounds{};
+	
+	//右孩子索引
+	size_t child1_index;
+
+	//三角形索引
+	size_t triangle_index;
+
+	//三角形数量
+	size_t triangle_count;
+
+};
+
 /// @brief 整个BVH树
-class BVH:public Shape
+class BVH :public Shape
 {
 public:
-	BVH() : root(nullptr) {}
-	~BVH();
-
 	//从三角形开始构造BVH树
 	void Build(std::vector<Triangle>&& triangles);
 
@@ -42,17 +56,18 @@ public:
 	std::optional<HitInfo> Intersect(const Ray& ray, float t_min, float t_max)const override;
 private:
 	//递归删除BVH树节点
-	void DeleteNode(BVHNode* node);
+	void DeleteNode(BVHTreeNode* node);
 
 	//递归分割BVH
-	void RecursiveSplit(BVHNode* node);
+	void RecursiveSplit(BVHTreeNode* node);
 
-	//递归相交检测
-	void RecursiveIntersect(
-		BVHNode* node,
-		const Ray& ray, float t_min, float& t_max,
-		std::optional<HitInfo>& closest_hit_info
-	)const;
+	//将BVH转化成线性结构
+	size_t RecursiveFlatten(BVHTreeNode* node);
+
 private:
-	BVHNode* root;
+	//存储BVH转化后的线性结构
+	std::vector<BVHNode> nodes;
+
+	//总的三角形列表(供BVH节点访问)
+	std::vector<Triangle> ordered_triangles;
 };
