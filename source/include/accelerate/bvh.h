@@ -56,35 +56,45 @@ struct alignas(32) BVHNode
 };
 
 /// @brief BVHTreeNode 内存池分配器
-/// 每次从操作系统申请一大块内存（4096个节点），在块内线性分配，
-/// 避免每次 new BVHTreeNode 的碎片化开销，析构时统一释放整块
+///
+/// 问题：BVH 构建时需要创建大量 BVHTreeNode，如果每次都用 new，
+///       会产生大量零散的系统调用，内存碎片化，效率低。
+///
+/// 解决：一次性向系统申请一大块内存（4096 个节点），
+///       在块内用下标线性分配，块满了再申请下一块。
+///       析构时统一释放，不需要逐个 delete。
+///
+/// 内存结构：
+///   nodes_list[0] → [node0][node1][node2]...[node4095]
+///   nodes_list[1] → [node0][node1][node2]...[node4095]  ← 第一块满了再申请
+///                                 ↑
+///                                ptr（当前块用到哪了，0~4095）
 class BVHTreeNodeAllocator
 {
 public:
-	// ptr 初始化为 4096，让第一次 allocate 触发新块申请
+	// ptr 故意初始化为 4096（已满状态），
+	// 让第一次 allocate() 就触发新块申请，不需要在构造函数里预申请
 	BVHTreeNodeAllocator() : ptr(4096) {}
 
-	// 从内存池中分配一个 BVHTreeNode
-	// 如果当前块已满，申请新的一块（4096个节点）
 	BVHTreeNode* allocate()
 	{
-		if (ptr == 4096)
+		if (ptr == 4096) // 当前块已满（或尚未申请），申请新块
 		{
 			nodes_list.push_back(new BVHTreeNode[4096]);
-			ptr = 0;
+			ptr = 0; // 从新块的第 0 个开始分配
 		}
-		return &(nodes_list.back()[ptr++]); 
+		return &(nodes_list.back()[ptr++]); // 返回当前位置，ptr 后移一位
 	}
 
-	// 析构时统一释放所有块，避免逐个 delete 的开销
+	// Build() 结束时 allocator 出作用域，析构自动释放整棵构建树
 	~BVHTreeNodeAllocator()
 	{
 		for (auto* nodes : nodes_list)
-			delete[] nodes;
+			delete[] nodes; // 整块释放，比逐个 delete 快得多
 	}
 
 private:
-	size_t ptr;                          // 当前块内的下一个可用位置
+	size_t ptr;                           // 当前块内下一个可用位置（0~4095）
 	std::vector<BVHTreeNode*> nodes_list; // 所有已申请的块
 };
 
