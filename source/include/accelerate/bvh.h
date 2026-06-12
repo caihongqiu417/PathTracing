@@ -17,6 +17,9 @@ struct BVHTreeNode
 
 	size_t depth;
 
+	//划分轴
+	size_t split_axis;
+
 	//遍历这个节点的所有三角形并更新节点的包围盒
 	void UpdateBounds()
 	{
@@ -52,6 +55,21 @@ struct alignas(32) BVHNode
 
 };
 
+/// @brief BVH树的统计信息，用于调试和性能分析
+/// RecursiveSplit 构建过程中实时填写，Build 完成后打印
+struct BVHState {
+	size_t total_node_count = 0;             // 总节点数（内部节点 + 叶子节点）
+	size_t leaf_node_count = 0;              // 叶子节点数（每个叶子对应一组三角形）
+	size_t max_leaf_node_triangle_count = 0; // 单个叶子节点最多包含的三角形数
+
+	// 每遇到一个叶子节点时调用，更新叶子相关统计
+	void AddLeafNode(BVHTreeNode* node)
+	{
+		leaf_node_count++;
+		max_leaf_node_triangle_count = glm::max(max_leaf_node_triangle_count, node->triangles.size());
+	}
+};
+
 /// @brief 整个BVH树
 class BVH :public Shape
 {
@@ -66,7 +84,7 @@ private:
 	void DeleteNode(BVHTreeNode* node);
 
 	//递归分割BVH
-	void RecursiveSplit(BVHTreeNode* node);
+	void RecursiveSplit(BVHTreeNode* node,BVHState& state);
 
 	//将BVH转化成线性结构
 	size_t RecursiveFlatten(BVHTreeNode* node);

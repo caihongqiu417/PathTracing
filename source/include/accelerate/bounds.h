@@ -25,11 +25,20 @@ struct Bounds
         b_max = glm::max(pos, b_max);  // 更新最大边界
     }
 
+    //获取表面积
+    float Area()const {
+        auto diag = Diagonal();
+        return (diag.x * (diag.y + diag.z) + diag.y * diag.z) * 2.f;
+    }
+
     // 判断射线是否与包围盒相交
     // ray   - 射线
     // t_min - 最小检测距离
     // t_max - 最大检测距离
     bool HasIntersection(const Ray& ray, float t_min, float t_max) const;
+
+    //优化：除法=>乘倒数
+    bool HasIntersection(const Ray& ray, const glm::vec3& inv_direction/*光线方向的倒数*/, float t_min, float t_max)const;
 
     //获取包围盒的对角线
     glm::vec3 Diagonal()const { return b_max - b_min; }

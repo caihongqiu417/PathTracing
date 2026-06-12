@@ -1,6 +1,7 @@
 #include "bvh.h"
 #include"debug_macro.h"
 #include<array>
+#include<iostream>
 
 
 //===========================================================================================
@@ -22,79 +23,137 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 	//根节点深度设置为1
 	root->depth = 1;
 
-	RecursiveSplit(root);
-	
+	BVHState state{};
+	RecursiveSplit(root, state);
+
+	std::cout << "[BVH] 总节点数:         " << state.total_node_count             << "\n"
+	          << "[BVH] 叶子节点数:       " << state.leaf_node_count              << "\n"
+	          << "[BVH] 叶子最大三角形数: " << state.max_leaf_node_triangle_count << "\n";
+
 	//BVH树结构=>BVH线性结构
 	RecursiveFlatten(root);
 }
 
 
 
-void BVH::RecursiveSplit(BVHTreeNode* node)
+void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state)
 {
-	//递归出口
-	if (node->triangles.size() == 1||node->depth>32)
-		return;
+	state.total_node_count++;
 
-	//找到包围盒最长的轴
+	// -----------------------------------------------------------------------
+	// 1. 递归出口
+	// -----------------------------------------------------------------------
+	if (node->triangles.size() == 1 || node->depth > 32)
+	{
+		state.AddLeafNode(node);
+		return;
+	}
+
+	// -----------------------------------------------------------------------
+	// 2. 选分割轴：包围盒最长的轴
+	// -----------------------------------------------------------------------
 	glm::vec3 diag = node->bounds.Diagonal();
 	size_t max_axis;
-	if (diag.x >= diag.y && diag.x >= diag.z)
-    	max_axis = 0;  // X轴最长
-	else if (diag.y >= diag.x && diag.y >= diag.z)
-    	max_axis = 1;  // Y轴最长
-	else
-		max_axis = 2;  // Z轴最长
+	if      (diag.x >= diag.y && diag.x >= diag.z) max_axis = 0;
+	else if (diag.y >= diag.x && diag.y >= diag.z) max_axis = 1;
+	else                                            max_axis = 2;
+	node->split_axis = max_axis;
 
-	node->split_axis = max_axis;//记录划分轴
+	// -----------------------------------------------------------------------
+	// 3. SAH：枚举 11 个分割点，选代价最小的
+	//    代价 = SA(左) * N_左 + SA(右) * N_右，再除以父节点面积归一化
+	//    SA 越大表示光线越容易击中该节点，N 越大表示需要测试的三角形越多
+	// -----------------------------------------------------------------------
+	float sa_parent = node->bounds.Area();
+	float best_mid  = node->bounds.b_min[max_axis] + diag[max_axis] * 0.5f; // 默认退化为中点
+	float min_cost  = std::numeric_limits<float>::infinity();
 
-	// 计算最长轴上的中心点位置（起点 + 总长度的一半）
-	float mid = node->bounds.b_min[max_axis] + diag[max_axis] * 0.5f;
-
-	//划分到两个三角形列表中
-	std::vector<Triangle> child0_triangles, child1_triangles;
-	for (const auto& triangle : node->triangles)
+	for (size_t i = 0; i < 11; i++)
 	{
-		// 计算三角形中心点在当前分割轴上的坐标
-		float center = (triangle.p0[max_axis] + triangle.p1[max_axis] + triangle.p2[max_axis]) / 3.0f;
+		// 候选分割点：将最长轴均匀分成 12 份，取第 i+1 个刻度
+		float mid = node->bounds.b_min[max_axis] + diag[max_axis] * (i + 1.f) / 12.f;
 
-		// 判断中心点在分割轴的哪一侧
-		if (center < mid)
+		// 遍历所有三角形，按重心坐标分到左右两侧，同时扩展各自的包围盒
+		Bounds left_bounds, right_bounds;
+		size_t left_count = 0, right_count = 0;
+		bool left_init = false, right_init = false;
+
+		for (const auto& triangle : node->triangles)
 		{
-			child0_triangles.push_back(triangle);
+			// 三角形重心在分割轴上的坐标
+			float center = (triangle.p0[max_axis] + triangle.p1[max_axis] + triangle.p2[max_axis]) / 3.f;
+			if (center < mid)
+			{
+				// 第一个三角形时用顶点初始化包围盒，避免原点污染
+				if (!left_init) { left_bounds = Bounds(triangle.p0, triangle.p0); left_init = true; }
+				left_bounds.Expand(triangle.p0);
+				left_bounds.Expand(triangle.p1);
+				left_bounds.Expand(triangle.p2);
+				left_count++;
+			}
+			else
+			{
+				if (!right_init) { right_bounds = Bounds(triangle.p0, triangle.p0); right_init = true; }
+				right_bounds.Expand(triangle.p0);
+				right_bounds.Expand(triangle.p1);
+				right_bounds.Expand(triangle.p2);
+				right_count++;
+			}
 		}
-		else
+
+		// 任一侧为空则为退化分割（所有三角形都在同一侧），跳过这个候选点
+		if (left_count == 0 || right_count == 0) continue;
+
+		// SAH 代价 = (SA_左 * N_左 + SA_右 * N_右) / SA_父
+		// 除以父节点面积是为了归一化，使不同层级的代价可以比较
+		float cost = (left_bounds.Area() * left_count + right_bounds.Area() * right_count) / sa_parent;
+		if (cost < min_cost)
 		{
-			child1_triangles.push_back(triangle);
+			min_cost = cost;
+			best_mid = mid; // 更新最优分割点
 		}
 	}
 
-	//创建两个子节点并分别放入三角形列表
-	if (child0_triangles.empty() || child1_triangles.empty())
-		return;
+	// -----------------------------------------------------------------------
+	// 4. 按最优分割点划分三角形
+	// -----------------------------------------------------------------------
+	std::vector<Triangle> child0_triangles, child1_triangles;
+	for (const auto& triangle : node->triangles)
+	{
+		float center = (triangle.p0[max_axis] + triangle.p1[max_axis] + triangle.p2[max_axis]) / 3.f;
+		if (center < best_mid)
+			child0_triangles.push_back(triangle);
+		else
+			child1_triangles.push_back(triangle);
+	}
 
+	// 极端聚集情况：所有三角形仍落在同一侧，无法继续分割
+	if (child0_triangles.empty() || child1_triangles.empty())
+	{
+		state.AddLeafNode(node);
+		return;
+	}
+
+	// -----------------------------------------------------------------------
+	// 5. 创建子节点并递归
+	// -----------------------------------------------------------------------
 	auto* child0 = new BVHTreeNode();
 	auto* child1 = new BVHTreeNode();
 	node->children[0] = child0;
 	node->children[1] = child1;
 
-	node->triangles.clear();			//清空当前节点的三角形！
+	node->triangles.clear();        // 内部节点不存三角形
 	node->triangles.shrink_to_fit();
 
-	//记录子节点深度（根节点+1）
 	child0->depth = node->depth + 1;
 	child1->depth = node->depth + 1;
-
 	child0->triangles = std::move(child0_triangles);
 	child1->triangles = std::move(child1_triangles);
-
-	//子节点更新包围盒
 	child0->UpdateBounds();
 	child1->UpdateBounds();
 
-	//递归分割子节点
-	RecursiveSplit(child0);
-	RecursiveSplit(child1);
+	RecursiveSplit(child0, state);
+	RecursiveSplit(child1, state);
 }
 
 
@@ -109,13 +168,15 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 
 	DEBUG_LINE(size_t bounds_test_count = 0, triangle_test_count = 0;)
 
-		//光线检测的方向(用于判断左右子树的遍历顺序)
+		//判断光线的方向(用于判断左右子树的遍历顺序)
 		glm::bvec3 dir_is_neg = {
 		ray.direction.x < 0,
 		ray.direction.y < 0,
 		ray.direction.z < 0
 	};
-		
+
+	//预先计算光线倒数（用于优化查找速率）
+	glm::vec3 inv_direction = 1.f / ray.direction;
 
 	//栈：代表待办节点
 	std::array<int, 32> stack;
@@ -131,7 +192,7 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 		DEBUG_LINE(bounds_test_count++;)
 
 		// -- a.如果光线和当前节点没有交点 --
-		if (!node.bounds.HasIntersection(ray, t_min, t_max))
+		if (!node.bounds.HasIntersection(ray,inv_direction,t_min, t_max))
 		{
 
 			if (ptr == stack.begin()) break; //a1 栈空：没有待办节点=>退出循环
