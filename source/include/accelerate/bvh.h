@@ -48,6 +48,8 @@ struct alignas(32) BVHNode
 	uint16_t triangle_count;
 	uint8_t depth;
 
+	uint8_t split_axis;  //划分的轴，用于决定左右子树的遍历顺序
+
 };
 
 /// @brief 整个BVH树

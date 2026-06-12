@@ -46,6 +46,8 @@ void BVH::RecursiveSplit(BVHTreeNode* node)
 	else
 		max_axis = 2;  // Z轴最长
 
+	node->split_axis = max_axis;//记录划分轴
+
 	// 计算最长轴上的中心点位置（起点 + 总长度的一半）
 	float mid = node->bounds.b_min[max_axis] + diag[max_axis] * 0.5f;
 
@@ -105,8 +107,15 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 
 	std::optional<HitInfo> closest_hit_info;
 
-	DEBUG_LINE(size_t bounds_test_count = 0, triangle_test_count = 0;)	
+	DEBUG_LINE(size_t bounds_test_count = 0, triangle_test_count = 0;)
 
+		//光线检测的方向(用于判断左右子树的遍历顺序)
+		glm::bvec3 dir_is_neg = {
+		ray.direction.x < 0,
+		ray.direction.y < 0,
+		ray.direction.z < 0
+	};
+		
 
 	//栈：代表待办节点
 	std::array<int, 32> stack;
@@ -134,8 +143,15 @@ std::optional<HitInfo> BVH::Intersect(const Ray& ray, float t_min, float t_max) 
 		if (node.triangle_count==0)
 		{
 			// b1 内部节点
-			current_node_index++; 			//进左子树
-			*(ptr++) = node.child1_index;	//压栈右子树
+			if (dir_is_neg[node.split_axis])	//如果光线在分割轴是负的=>则先右再左
+			{
+				*(ptr++) = node.child1_index;	//压栈右子树
+				current_node_index++; 			//进左子树
+			}
+			else {
+				current_node_index++; 			//进左子树
+				*(ptr++) = node.child1_index;	//压栈右子树
+			}
 		}
 		else
 		{
@@ -182,7 +198,8 @@ size_t BVH::RecursiveFlatten(BVHTreeNode* node)
 		node->bounds,									// AABB
 		0,												// Union(内部：右孩子索引/叶子：三角形索引)
 		static_cast<uint16_t>(node->triangles.size()), 	// 三角形数量
-		static_cast<uint8_t>(node->depth)				// 对应原先BVH树的深度
+		static_cast<uint8_t>(node->depth),				// 对应原先BVH树的深度
+		static_cast<uint8_t>(node->split_axis)			//划分轴
 	};
 	
 
