@@ -55,6 +55,39 @@ struct alignas(32) BVHNode
 
 };
 
+/// @brief BVHTreeNode 内存池分配器
+/// 每次从操作系统申请一大块内存（4096个节点），在块内线性分配，
+/// 避免每次 new BVHTreeNode 的碎片化开销，析构时统一释放整块
+class BVHTreeNodeAllocator
+{
+public:
+	// ptr 初始化为 4096，让第一次 allocate 触发新块申请
+	BVHTreeNodeAllocator() : ptr(4096) {}
+
+	// 从内存池中分配一个 BVHTreeNode
+	// 如果当前块已满，申请新的一块（4096个节点）
+	BVHTreeNode* allocate()
+	{
+		if (ptr == 4096)
+		{
+			nodes_list.push_back(new BVHTreeNode[4096]);
+			ptr = 0;
+		}
+		return &(nodes_list.back()[ptr++]); 
+	}
+
+	// 析构时统一释放所有块，避免逐个 delete 的开销
+	~BVHTreeNodeAllocator()
+	{
+		for (auto* nodes : nodes_list)
+			delete[] nodes;
+	}
+
+private:
+	size_t ptr;                          // 当前块内的下一个可用位置
+	std::vector<BVHTreeNode*> nodes_list; // 所有已申请的块
+};
+
 /// @brief BVH树的统计信息，用于调试和性能分析
 /// RecursiveSplit 构建过程中实时填写，Build 完成后打印
 struct BVHState {
@@ -84,7 +117,7 @@ private:
 	void DeleteNode(BVHTreeNode* node);
 
 	//递归分割BVH
-	void RecursiveSplit(BVHTreeNode* node,BVHState& state);
+	void RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocator& allocator);
 
 	//将BVH转化成线性结构
 	size_t RecursiveFlatten(BVHTreeNode* node);

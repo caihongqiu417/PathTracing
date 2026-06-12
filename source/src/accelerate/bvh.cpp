@@ -15,8 +15,12 @@
 //===========================================================================================
 void BVH::Build(std::vector<Triangle>&& triangles)
 {
+	// 创建内存池，构建期间所有 BVHTreeNode 从这里分配
+	// Build 结束时 allocator 析构，自动释放整棵树
+	BVHTreeNodeAllocator allocator;
+
 	//三角形列表=>BVH树结构
-	auto root = new BVHTreeNode{};
+	auto root = allocator.allocate();
 	root->triangles = std::move(triangles);
 	root->UpdateBounds();
 
@@ -24,7 +28,7 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 	root->depth = 1;
 
 	BVHState state{};
-	RecursiveSplit(root, state);
+	RecursiveSplit(root, state, allocator);
 
 	std::cout << "[BVH] 总节点数:         " << state.total_node_count             << "\n"
 	          << "[BVH] 叶子节点数:       " << state.leaf_node_count              << "\n"
@@ -36,7 +40,7 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 
 
 
-void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state)
+void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocator& allocator)
 {
 	state.total_node_count++;
 
@@ -137,8 +141,8 @@ void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state)
 	// -----------------------------------------------------------------------
 	// 5. 创建子节点并递归
 	// -----------------------------------------------------------------------
-	auto* child0 = new BVHTreeNode();
-	auto* child1 = new BVHTreeNode();
+	auto* child0 = allocator.allocate();
+	auto* child1 = allocator.allocate();
 	node->children[0] = child0;
 	node->children[1] = child1;
 
@@ -152,8 +156,8 @@ void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state)
 	child0->UpdateBounds();
 	child1->UpdateBounds();
 
-	RecursiveSplit(child0, state);
-	RecursiveSplit(child1, state);
+	RecursiveSplit(child0, state, allocator);
+	RecursiveSplit(child1, state, allocator);
 }
 
 
