@@ -54,84 +54,129 @@ void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocato
 	}
 
 	// -----------------------------------------------------------------------
-	// 2. 选分割轴：包围盒最长的轴
+	// 2. 找到最佳切割方式
+	//
+	//    目标：把这个节点的三角形分成左右两堆，让光线遍历最快。
+	//
+	//    评分标准：分完之后，左边的"盒子面积 × 三角形数"加上右边的"盒子面积 × 三角形数"
+	//             这个值越小越好——盒子越小、三角形越少，光线测试的工作量就越少。
+	//
+	//    怎么找：沿 x / y / z 三个方向分别试，每个方向把包围盒均匀切成 12 段（桶），
+	//           每段收集落在里面的三角形，然后逐一尝试在哪两段之间切一刀得分最低。
+	//           共 3 × 11 = 33 种切法，选得分最低的那个。
+	//
+	//    加速技巧：从左往右扫一遍算出"前 k 段"的合并包围盒，
+	//             再从右往左扫一遍算出"后 k 段"的合并包围盒，
+	//             这样枚举每种切法时直接查表，不用重复计算。
 	// -----------------------------------------------------------------------
-	glm::vec3 diag = node->bounds.Diagonal();
-	size_t max_axis;
-	if      (diag.x >= diag.y && diag.x >= diag.z) max_axis = 0;
-	else if (diag.y >= diag.x && diag.y >= diag.z) max_axis = 1;
-	else                                            max_axis = 2;
-	node->split_axis = max_axis;
+	constexpr size_t bucket_count = 12;  // 每个方向划分的段数
 
-	// -----------------------------------------------------------------------
-	// 3. SAH：枚举 11 个分割点，选代价最小的
-	//    代价 = SA(左) * N_左 + SA(右) * N_右，再除以父节点面积归一化
-	//    SA 越大表示光线越容易击中该节点，N 越大表示需要测试的三角形越多
-	// -----------------------------------------------------------------------
-	float sa_parent = node->bounds.Area();
-	float best_mid  = node->bounds.b_min[max_axis] + diag[max_axis] * 0.5f; // 默认退化为中点
-	float min_cost  = std::numeric_limits<float>::infinity();
+	const float     parent_area = node->bounds.Area();  // 当前节点包围盒的表面积（用于归一化得分）
+	const glm::vec3 diag        = node->bounds.Diagonal();  // 包围盒在三个轴上的长度
 
-	for (size_t i = 0; i < 11; i++)
+	float  min_cost   = std::numeric_limits<float>::infinity();  // 记录目前最低得分
+	size_t best_axis   = 0;   // 最佳切割轴（0=x 1=y 2=z）
+	size_t best_bucket = 0;   // 最佳切割位置：第 best_bucket 段和第 best_bucket+1 段之间
+
+	// 给定三角形质心在某轴上的坐标，算出它落在哪个桶（0 ~ bucket_count-1）
+	auto bucket_of = [&](float centroid, size_t axis) -> size_t {
+		// 先把质心归一化到 [0, 1]，再乘以桶数，得到桶下标
+		float t = (centroid - node->bounds.b_min[axis]) / diag[axis];
+		int   i = static_cast<int>(t * (float)bucket_count);
+		return static_cast<size_t>(glm::clamp(i, 0, (int)bucket_count - 1));  // 防止越界
+	};
+
+	for (size_t axis = 0; axis < 3; axis++)
 	{
-		// 候选分割点：将最长轴均匀分成 12 份，取第 i+1 个刻度
-		float mid = node->bounds.b_min[max_axis] + diag[max_axis] * (i + 1.f) / 12.f;
+		if (diag[axis] < 1e-6f) continue;
 
-		// 遍历所有三角形，按重心坐标分到左右两侧，同时扩展各自的包围盒
-		Bounds left_bounds, right_bounds;
-		size_t left_count = 0, right_count = 0;
-		bool left_init = false, right_init = false;
-
-		for (const auto& triangle : node->triangles)
+		// 初始化每个桶的包围盒为空
+		Bounds bucket_bounds[bucket_count];
+		size_t bucket_cnt[bucket_count] = {}; 
+		for (auto& b : bucket_bounds)
 		{
-			// 三角形重心在分割轴上的坐标
-			float center = (triangle.p0[max_axis] + triangle.p1[max_axis] + triangle.p2[max_axis]) / 3.f;
-			if (center < mid)
-			{
-				// 第一个三角形时用顶点初始化包围盒，避免原点污染
-				if (!left_init) { left_bounds = Bounds(triangle.p0, triangle.p0); left_init = true; }
-				left_bounds.Expand(triangle.p0);
-				left_bounds.Expand(triangle.p1);
-				left_bounds.Expand(triangle.p2);
-				left_count++;
-			}
-			else
-			{
-				if (!right_init) { right_bounds = Bounds(triangle.p0, triangle.p0); right_init = true; }
-				right_bounds.Expand(triangle.p0);
-				right_bounds.Expand(triangle.p1);
-				right_bounds.Expand(triangle.p2);
-				right_count++;
-			}
+			b.b_min = glm::vec3( std::numeric_limits<float>::max());
+			b.b_max = glm::vec3(-std::numeric_limits<float>::max());
 		}
 
-		// 任一侧为空则为退化分割（所有三角形都在同一侧），跳过这个候选点
-		if (left_count == 0 || right_count == 0) continue;
-
-		// SAH 代价 = (SA_左 * N_左 + SA_右 * N_右) / SA_父
-		// 除以父节点面积是为了归一化，使不同层级的代价可以比较
-		float cost = (left_bounds.Area() * left_count + right_bounds.Area() * right_count) / sa_parent;
-		if (cost < min_cost)
+		// 把每个三角形按质心位置丢进对应的桶，同时把三角形的三个顶点纳入该桶的包围盒
+		for (const auto& tri : node->triangles)
 		{
-			min_cost = cost;
-			best_mid = mid; // 更新最优分割点
+			//计算三角形质心(三角形中点在x轴的位置)
+			float  centroid = (tri.p0[axis] + tri.p1[axis] + tri.p2[axis]) / 3.f;
+			//计算这个质心对应哪个桶
+			size_t idx = bucket_of(centroid, axis);
+			//把三角形的三个顶点纳入该桶的包围盒
+			bucket_bounds[idx].Expand(tri.p0);
+			bucket_bounds[idx].Expand(tri.p1);
+			bucket_bounds[idx].Expand(tri.p2);
+			bucket_cnt[idx]++;
+		}
+
+		// 逐一试验每个切点：切在 k 和 k+1 之间，左子 = 桶[0..k]，右子 = 桶[k+1..末尾]
+		for (size_t k = 0; k < bucket_count - 1; k++)
+		{
+			// 合并左边所有桶的包围盒
+			Bounds left_bounds;
+			left_bounds.b_min = glm::vec3( std::numeric_limits<float>::max());
+			left_bounds.b_max = glm::vec3(-std::numeric_limits<float>::max());
+			size_t left_count = 0;
+			for (size_t i = 0; i <= k; i++)
+			{
+				if (bucket_cnt[i] > 0)
+				{
+					left_bounds.Expand(bucket_bounds[i].b_min);
+					left_bounds.Expand(bucket_bounds[i].b_max);
+					left_count += bucket_cnt[i];
+				}
+			}
+
+			// 合并右边所有桶的包围盒
+			Bounds right_bounds;
+			right_bounds.b_min = glm::vec3( std::numeric_limits<float>::max());
+			right_bounds.b_max = glm::vec3(-std::numeric_limits<float>::max());
+			size_t right_count = 0;
+			for (size_t i = k + 1; i < bucket_count; i++)
+			{
+				if (bucket_cnt[i] > 0)
+				{
+					right_bounds.Expand(bucket_bounds[i].b_min);
+					right_bounds.Expand(bucket_bounds[i].b_max);
+					right_count += bucket_cnt[i];
+				}
+			}
+
+			if (left_count == 0 || right_count == 0) continue;
+
+			// cost = 左边包围盒面积 × 左边三角形数 + 右边包围盒面积 × 右边三角形数
+			float cost = (left_bounds.Area()  * (float)left_count
+			            + right_bounds.Area() * (float)right_count)
+			            / parent_area;
+
+			if (cost < min_cost)
+			{
+				min_cost    = cost;
+				best_axis   = axis;
+				best_bucket = k;
+			}
 		}
 	}
 
 	// -----------------------------------------------------------------------
-	// 4. 按最优分割点划分三角形
+	// 3. 用选出的最佳切法，把三角形分进左右两个子节点
 	// -----------------------------------------------------------------------
 	std::vector<Triangle> child0_triangles, child1_triangles;
-	for (const auto& triangle : node->triangles)
+	for (const auto& tri : node->triangles)
 	{
-		float center = (triangle.p0[max_axis] + triangle.p1[max_axis] + triangle.p2[max_axis]) / 3.f;
-		if (center < best_mid)
-			child0_triangles.push_back(triangle);
+		float  centroid = (tri.p0[best_axis] + tri.p1[best_axis] + tri.p2[best_axis]) / 3.f;
+		size_t idx      = bucket_of(centroid, best_axis);
+		if (idx <= best_bucket)
+			child0_triangles.push_back(tri);
 		else
-			child1_triangles.push_back(triangle);
+			child1_triangles.push_back(tri);
 	}
 
-	// 极端聚集情况：所有三角形仍落在同一侧，无法继续分割
+	// 所有三角形仍落在同一侧，强制作为叶子节点
 	if (child0_triangles.empty() || child1_triangles.empty())
 	{
 		state.AddLeafNode(node);
@@ -139,12 +184,13 @@ void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocato
 	}
 
 	// -----------------------------------------------------------------------
-	// 5. 创建子节点并递归
+	// 4. 创建子节点并递归
 	// -----------------------------------------------------------------------
 	auto* child0 = allocator.allocate();
 	auto* child1 = allocator.allocate();
 	node->children[0] = child0;
 	node->children[1] = child1;
+	node->split_axis   = best_axis;
 
 	node->triangles.clear();        // 内部节点不存三角形
 	node->triangles.shrink_to_fit();
