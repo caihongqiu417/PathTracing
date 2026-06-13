@@ -9,7 +9,7 @@ glm::vec3 RTRenderer::RenderPixel(const glm::ivec2& pixel_coord)
     //==============================
     // 初始化
     //==============================
-    constexpr int max_bounces = 8;          // 最大反弹次数
+    constexpr int max_bounces = 16;          // 最大反弹次数
     constexpr float ray_origin_bias = 1e-4f;// 避免自相交的偏移量
 
     glm::vec3 beta = { 1.f, 1.f, 1.f };     // 路径衰减系数

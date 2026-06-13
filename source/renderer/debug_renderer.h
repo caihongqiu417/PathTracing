@@ -2,17 +2,41 @@
 
 #include "renderer/base_renderer.h"
 
-/// @brief 显示BVH包围盒检测次数的热力图
-/// 蓝色表示检测次数少，红色表示检测次数多
-/// 用于可视化BVH加速结构的效率
-DEFINE_RENDERER(BoundsTest, "BVH Bounds Test Heatmap")
+// BoundsTest：包围盒检测次数热力图（SceneBVH + 模型BVH 合计）
+class BoundsTestRenderer : public BaseRenderer {
+public:
+    BoundsTestRenderer(Camera& camera, const Scene& scene)
+        : BaseRenderer(camera, scene) {}
+private:
+    const char* RendererName() const override { return "BVH Bounds Test Heatmap"; }
+    glm::vec3 RenderPixel(const glm::ivec2& pixel_coord) override;
 
-/// @brief 显示三角形检测次数的热力图
-/// 蓝色表示检测次数少，红色表示检测次数多
-/// 用于找出需要更多细分的区域
-DEFINE_RENDERER(TriangleTest, "Triangle Test Heatmap")
+    bool  max_value_cached = false;
+    float max_bounds       = 1.f;
+};
 
-/// @brief 显示BVH树遍历深度的热力图
-/// 蓝色表示树深度浅，红色表示树深度深
-/// 用于检查BVH树的平衡性
-DEFINE_RENDERER(BoundsDepth, "BVH Tree Depth Heatmap")
+// TriangleTest：三角形检测次数热力图
+class TriangleTestRenderer : public BaseRenderer {
+public:
+    TriangleTestRenderer(Camera& camera, const Scene& scene)
+        : BaseRenderer(camera, scene) {}
+private:
+    const char* RendererName() const override { return "Triangle Test Heatmap"; }
+    glm::vec3 RenderPixel(const glm::ivec2& pixel_coord) override;
+
+    bool  max_value_cached = false;
+    float max_triangles    = 1.f;
+};
+
+// BoundsDepth：BVH树遍历深度热力图
+class BoundsDepthRenderer : public BaseRenderer {
+public:
+    BoundsDepthRenderer(Camera& camera, const Scene& scene)
+        : BaseRenderer(camera, scene) {}
+private:
+    const char* RendererName() const override { return "BVH Tree Depth Heatmap"; }
+    glm::vec3 RenderPixel(const glm::ivec2& pixel_coord) override;
+
+    bool  max_value_cached = false;
+    float max_depth        = 1.f;
+};

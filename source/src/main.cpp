@@ -1,4 +1,5 @@
 #include <windows.h>
+#undef RGB  // windows.h 定义了 RGB(r,g,b) 宏，会和项目的 RGB 类冲突
 #include "camera/camera.h"
 #include "camera/film.h"
 #include "renderer/debug_renderer.h"

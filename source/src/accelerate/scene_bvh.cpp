@@ -303,7 +303,7 @@ std::optional<HitInfo> SceneBVH::Intersect(const Ray& ray, float t_min, float t_
 
 	if (closest_hit_info.has_value())
 	{
-		DEBUG_LINE(closest_hit_info->bounds_test_count   = bounds_test_count;)
+		DEBUG_LINE(closest_hit_info->bounds_test_count   += bounds_test_count;)  // 累加，不覆盖，保留模型内部BVH的开销
 		DEBUG_LINE(closest_hit_info->instance_test_count = instance_test_count;)
 	}
 
