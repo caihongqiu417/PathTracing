@@ -1,3 +1,4 @@
+#include <windows.h>
 #include "camera/camera.h"
 #include "camera/film.h"
 #include "renderer/debug_renderer.h"
@@ -15,6 +16,7 @@
 
 int main()
 {
+	SetConsoleOutputCP(CP_UTF8);
 	constexpr size_t width = 1920;
 	constexpr size_t height = 1080;
 	constexpr size_t spp = 16;
@@ -44,7 +46,8 @@ int main()
 		{ 3, 0.5, -2}
 	);
 
-	scene.AddShape(plane,{{1,1,1},false,RGB{128,128,255}},{0,-0.5,0});
+	scene.AddShape(plane, { {1,1,1},false,RGB{128,128,255} }, { 0,-0.5,0 });
+	scene.Build();
 
 	// Debug 热力图
 	Film bounds_test_film{ width, height };

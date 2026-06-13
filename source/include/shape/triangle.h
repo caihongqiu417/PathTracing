@@ -25,6 +25,14 @@ struct Triangle : public Shape {
 
 	//相交测试
 	std::optional<HitInfo> Intersect(const Ray& ray, float t_min, float t_max)const override;
+
+	Bounds GetBounds()const override {
+		Bounds bounds{};
+		bounds.Expand(p0);
+		bounds.Expand(p1);
+		bounds.Expand(p2);
+		return bounds;
+	}
 	//顶点
 	glm::vec3 p0, p1, p2;
 

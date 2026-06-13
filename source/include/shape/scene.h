@@ -1,28 +1,13 @@
 #pragma once
 
 #include "shape.h"
+#include"scene_bvh.h"
 
 #include <glm/glm.hpp>
 #include <limits>
 #include <vector>
 
-// 坐标约定：
-// 1. 相机、光源、射线默认都在世界空间里
-// 2. 模型文件里的顶点先在模型空间里
-// 3. ShapeInstance 负责在这两套坐标之间来回转换
-
-struct ShapeInstance
-{
-	const Shape& shape;
-	// 材质按值保存，避免 AddShape 传入临时对象时留下悬空引用。
-	Material material;
-
-	// 把模型空间变到世界空间
-	glm::mat4 world_from_object;
-
-	// 把世界空间变回模型空间
-	glm::mat4 object_from_world;
-};
+// ShapeInstance 定义在 scene_bvh.h 中（已通过上面的 include 引入）
 
 struct Scene : public Shape
 {
@@ -43,6 +28,10 @@ public:
 		float t_max = (std::numeric_limits<float>::max)()
 	) const override;
 
+	//构建场景级包围盒
+	void Build() { scene_bvh.Build(std::move(instances)); }
+
 private:
 	std::vector<ShapeInstance> instances;
+	SceneBVH scene_bvh{};
 };

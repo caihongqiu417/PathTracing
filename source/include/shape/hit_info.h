@@ -13,9 +13,10 @@ struct HitInfo
 
 	//调试信息
 	#ifdef WITH_DEBUG_INFO
-		size_t bounds_test_count = 0;
-		size_t triangle_test_count = 0;
-		size_t bounds_depth = 0; 			
+		size_t bounds_test_count    = 0;  // 检测了多少个包围盒
+		size_t triangle_test_count  = 0;  // 检测了多少个三角形
+		size_t instance_test_count  = 0;  // 检测了多少个场景实例（SceneBVH 用）
+		size_t bounds_depth         = 0;  // 命中点所在叶子节点的深度
 	#endif
 
 	// 当找到一条光线与表面的交点时
