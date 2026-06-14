@@ -1,10 +1,9 @@
 #include "renderer/debug_renderer.h"
 #include "util/debug_macro.h"
 #include "util/rgb.h"
+#include "thread/spin_lock.h"
 #include <iostream>
 
-// 先扫一遍所有像素拿到最大值，再用最大值做分母归一化
-// 避免写死分母导致颜色全压在紫色（太小）或全黄（太大）
 template<typename GetValue>
 static glm::vec3 RenderHeatmapPixel(
     const Camera& camera, const Scene& scene, const glm::ivec2& pixel_coord,
@@ -19,12 +18,12 @@ static glm::vec3 RenderHeatmapPixel(
     return glm::vec3(0.0f);
 }
 
+// 单线程扫全图找最大值，只调用一次
 template<typename GetValue>
 static float FindMaxValue(
-    const Camera& camera, const Scene& scene,
-    Rng& rng, GetValue get_value)
+    const Camera& camera, const Scene& scene, Rng& rng, GetValue get_value)
 {
-    float max_val = 1.f;  // 至少为 1，防止除以 0
+    float max_val = 1.f;
     DEBUG_LINE(
         int w = (int)camera.GetFilm().GetWidth();
         int h = (int)camera.GetFilm().GetHeight();
@@ -41,17 +40,23 @@ static float FindMaxValue(
 }
 
 // ===========================================================================================
-// BoundsTest 渲染器：显示包围盒检测次数（SceneBVH + 模型BVH 合计）
+// BoundsTest
 // ===========================================================================================
 
 glm::vec3 BoundsTestRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 {
     DEBUG_LINE(
+        // 双重检查锁：保证多线程下预扫描只跑一次
         if (!max_value_cached)
         {
-            max_bounds = FindMaxValue(camera, scene, rng, [](const HitInfo& h){ return (float)h.bounds_test_count; });
-            max_value_cached = true;
-            std::cout << "[BoundsTest] 最大包围盒测试次数: " << (int)max_bounds << "\n";
+            Guard guard(scan_lock);
+            if (!max_value_cached)
+            {
+                max_bounds = FindMaxValue(camera, scene, rng,
+                    [](const HitInfo& h){ return (float)h.bounds_test_count; });
+                max_value_cached = true;
+                std::cout << "[BoundsTest] 最大包围盒测试次数: " << (int)max_bounds << "\n";
+            }
         }
         return RenderHeatmapPixel(camera, scene, pixel_coord, rng, max_bounds,
             [](const HitInfo& h){ return (float)h.bounds_test_count; });
@@ -60,7 +65,7 @@ glm::vec3 BoundsTestRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 }
 
 // ===========================================================================================
-// TriangleTest 渲染器：显示三角形检测次数
+// TriangleTest
 // ===========================================================================================
 
 glm::vec3 TriangleTestRenderer::RenderPixel(const glm::ivec2& pixel_coord)
@@ -68,9 +73,14 @@ glm::vec3 TriangleTestRenderer::RenderPixel(const glm::ivec2& pixel_coord)
     DEBUG_LINE(
         if (!max_value_cached)
         {
-            max_triangles = FindMaxValue(camera, scene, rng, [](const HitInfo& h){ return (float)h.triangle_test_count; });
-            max_value_cached = true;
-            std::cout << "[TriangleTest] 最大三角形测试次数: " << (int)max_triangles << "\n";
+            Guard guard(scan_lock);
+            if (!max_value_cached)
+            {
+                max_triangles = FindMaxValue(camera, scene, rng,
+                    [](const HitInfo& h){ return (float)h.triangle_test_count; });
+                max_value_cached = true;
+                std::cout << "[TriangleTest] 最大三角形测试次数: " << (int)max_triangles << "\n";
+            }
         }
         return RenderHeatmapPixel(camera, scene, pixel_coord, rng, max_triangles,
             [](const HitInfo& h){ return (float)h.triangle_test_count; });
@@ -79,7 +89,7 @@ glm::vec3 TriangleTestRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 }
 
 // ===========================================================================================
-// BoundsDepth 渲染器：显示BVH树遍历深度
+// BoundsDepth
 // ===========================================================================================
 
 glm::vec3 BoundsDepthRenderer::RenderPixel(const glm::ivec2& pixel_coord)
@@ -87,9 +97,14 @@ glm::vec3 BoundsDepthRenderer::RenderPixel(const glm::ivec2& pixel_coord)
     DEBUG_LINE(
         if (!max_value_cached)
         {
-            max_depth = FindMaxValue(camera, scene, rng, [](const HitInfo& h){ return (float)h.bounds_depth; });
-            max_value_cached = true;
-            std::cout << "[BoundsDepth] 最大BVH深度: " << (int)max_depth << "\n";
+            Guard guard(scan_lock);
+            if (!max_value_cached)
+            {
+                max_depth = FindMaxValue(camera, scene, rng,
+                    [](const HitInfo& h){ return (float)h.bounds_depth; });
+                max_value_cached = true;
+                std::cout << "[BoundsDepth] 最大BVH深度: " << (int)max_depth << "\n";
+            }
         }
         return RenderHeatmapPixel(camera, scene, pixel_coord, rng, max_depth,
             [](const HitInfo& h){ return (float)h.bounds_depth; });

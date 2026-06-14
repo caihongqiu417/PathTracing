@@ -27,7 +27,7 @@ class BaseRenderer
 {
 public:
 	BaseRenderer(Camera& camera, const Scene& scene)
-		: camera(camera), scene(scene), rng(0u)
+		: camera(camera), scene(scene)
 	{
 	}
 
@@ -45,6 +45,6 @@ private:
 protected:
 	Camera& camera;
 	const Scene& scene;
-	// 当前样本用的随机数。
-	Rng rng;
+	// 每个线程独立的随机数状态，避免多线程竞争
+	static thread_local Rng rng;
 };
