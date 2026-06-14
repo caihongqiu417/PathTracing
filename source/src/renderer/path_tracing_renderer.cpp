@@ -51,22 +51,11 @@ glm::vec3 PathTracingRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 		}
 		else
 		{
-			// 漫反射：均匀半球采样（接受拒绝法）
-			glm::vec3 dir;
-			do {
-				dir = glm::vec3(rng.Float01(), rng.Float01(), rng.Float01()) * 2.f - 1.f;
-			} while (glm::length(dir) > 1.f);
-			if (dir.y < 0.f) dir.y = -dir.y;
-			new_direction = glm::normalize(dir);
-
-			// 蒙特卡洛权重：brdf × cos(θ) / pdf
-			//   brdf = albedo / π（Lambertian）
-			//   pdf  = 1 / (2π)（均匀半球）
-			//   cos(θ) = dot(方向, 法线) = new_direction.y（局部空间，法线=(0,1,0)）
-			float     cos_theta = new_direction.y;
-			glm::vec3 brdf      = hit_info->material->albedo / pi;
-			float     pdf       = 1.f / (2.f * pi);
-			beta *= brdf * cos_theta / pdf;
+			// 漫反射：余弦重要性采样
+			// pdf = cos(θ) / π，brdf = albedo / π
+			// beta *= brdf * cos / pdf = (albedo/π) * cos / (cos/π) = albedo，cos 约掉了
+			new_direction = CosineSampleHemisphere({ rng.Float01(), rng.Float01() });
+			beta *= hit_info->material->albedo;
 		}
 
 		// -- f. 更新光线，准备下一次弹射 --
