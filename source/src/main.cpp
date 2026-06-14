@@ -5,6 +5,7 @@
 #include "renderer/debug_renderer.h"
 #include "renderer/normal_renderer.h"
 #include "renderer/rt_renderer.h"
+#include "renderer/path_tracing_renderer.h"
 #include "shape/model.h"
 #include "shape/plane.h"
 #include "shape/scene.h"
@@ -69,10 +70,16 @@ int main()
 	scene.Build();
 
 	// 路径追踪图
-	Film rt_film{ width, height };
-	Camera rt_camera{ rt_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	RTRenderer rt_renderer{ rt_camera, scene };
-	rt_renderer.Render(spp, "Output.ppm");
+	Film pt_film{ width, height };
+	Camera pt_camera{ pt_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	PathTracingRenderer pt_renderer{ pt_camera, scene };
+	pt_renderer.Render(spp, "Output.ppm");
+
+	// 简单光追图
+	//Film rt_film{ width, height };
+	//Camera rt_camera{ rt_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	//RTRenderer rt_renderer{ rt_camera, scene };
+	//rt_renderer.Render(spp, "Output_rt.ppm");
 
 	// Debug 热力图
 	Film bounds_test_film{ width, height };
