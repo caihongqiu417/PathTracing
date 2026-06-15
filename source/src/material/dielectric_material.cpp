@@ -1,70 +1,81 @@
 #include "dielectric_material.h"
+#include <cmath>
 
-/// @brief 计算 Fresnel 反射率
-/// @param etai_div_etat 折射率之比 η_t / η_i（折射介质 / 入射介质）
-/// @param cos_theta_t 入射角的余弦值（view_direction 与法线的点积）
-/// @param cos_theta_i 折射角的余弦值，由函数内部通过斯涅尔定律计算后写出
-/// @return 反射率 [0, 1]，1 表示全反射
-float Fresnel(float etai_div_etat, float cos_theta_t, float& cos_theta_i)
+// 菲涅耳公式（精确版，适用于电介质）
+// etai_div_etat : η_transmitted / η_incident（折射率之比）
+// cos_theta_t   : 入射角余弦（已知量）
+// cos_theta_i   : 折射角余弦（输出，由斯涅尔定律计算）
+// 返回：反射率 [0,1]，全内反射时返回 1
+static float Fresnel(float etai_div_etat, float cos_theta_t, float& cos_theta_i)
 {
-	// i= incident（入射） t = transmitted（透射）
-	float sin2_theta_t = 1 - cos_theta_t * cos_theta_t;
-	float sin2_theta_i = sin2_theta_t / (etai_div_etat * etai_div_etat);
+    float sin2_theta_t = 1.f - cos_theta_t * cos_theta_t;
+    float sin2_theta_i = sin2_theta_t / (etai_div_etat * etai_div_etat);
 
-	//发生全反射
-	if (sin2_theta_i >= 1)
-		return 1;
+    if (sin2_theta_i >= 1.f)
+        return 1.f;  // 全内反射：折射角不存在
 
-	//算出折射角的 cos
-	cos_theta_i = glm::sqrt(1 - sin2_theta_i);
+    cos_theta_i = glm::sqrt(1.f - sin2_theta_i);
 
-	// r_parl：平行偏振分量   r_perp：垂直偏振分量
-	float r_parl = (etai_div_etat * cos_theta_t - cos_theta_i)
-	             / (etai_div_etat * cos_theta_t + cos_theta_i);
-	float r_perp = (cos_theta_t - etai_div_etat * cos_theta_i)
-	             / (cos_theta_t + etai_div_etat * cos_theta_i);
+    // Fresnel 方程：平行 / 垂直偏振分量的振幅反射率
+    float r_parl = (etai_div_etat * cos_theta_t - cos_theta_i)
+                 / (etai_div_etat * cos_theta_t + cos_theta_i);
+    float r_perp = (cos_theta_t - etai_div_etat * cos_theta_i)
+                 / (cos_theta_t + etai_div_etat * cos_theta_i);
 
-	// 返回反射率（决定走反射还是折射）
-	return (r_parl * r_parl + r_perp * r_perp) / 2.f;
+    // 非偏振光：取两者的功率平均
+    return (r_parl * r_parl + r_perp * r_perp) * 0.5f;
 }
 
-glm::vec3 DielectricMaterial::SampleBSDF(const glm::vec3& hit_point, const glm::vec3& view_direction, glm::vec3& beta, const Rng& rng) const
+std::optional<BSDFSample> DielectricMaterial::SampleBSDF(
+    const glm::vec3& hit_point,
+    const glm::vec3& view_direction,
+    const Rng& rng) const
 {
-	
-	//根据观察方向y分量的正负，判断光线是从外面射入还是从里面射出
-	float cos_theta_t = view_direction.y;
+    // view_direction.y > 0 → 光线从外部入射（空气 → 玻璃）
+    // view_direction.y < 0 → 光线从内部射出（玻璃 → 空气）
+    float cos_theta_t = view_direction.y;
 
+    float     etai_div_etat = ior;       // 默认：η_trans / η_inc = ior / 1
+    glm::vec3 normal        = {0, 1, 0};
 
-	// -- a. 光线从外面射入 --
-	float etai_div_etat = ior / 1.f; /* η1/η2 */
-	glm::vec3 normal = { 0,1,0 };
+    if (cos_theta_t < 0.f)
+    {
+        etai_div_etat = 1.f / ior;       // 玻璃 → 空气，比值倒置
+        normal        = {0, -1, 0};      // 法线翻转（指向玻璃内侧）
+        cos_theta_t   = -cos_theta_t;    // 取正值
+    }
 
+    float cos_theta_i = 0.f;             // 由 Fresnel 函数填写
+    float reflectance = Fresnel(etai_div_etat, cos_theta_t, cos_theta_i);
 
-	// -- b. 光线从里面射出 --
-	if (cos_theta_t < 0)
-	{
+    if (rng.Float01() <= reflectance)
+    {
+        // ── 反射分支（以概率 reflectance 选中）──
+        // 概率 reflectance 与 Fresnel 权重相消，等价于直接使用 albedo_r
+        glm::vec3 reflect_dir = {-view_direction.x, view_direction.y, -view_direction.z};
 
-		etai_div_etat = 1.f / ior;   	//介质射入空气
+        // delta BRDF：f = albedo_r / cos(θ)，pdf = 1
+        // 渲染器执行 f * cos / pdf = albedo_r
+        return BSDFSample{
+            albedo_r / reflect_dir.y,
+            1.0f,
+            reflect_dir
+        };
+    }
+    else
+    {
+        // ── 折射分支（以概率 1 - reflectance 选中）──
+        glm::vec3 refract_dir = (-view_direction / etai_div_etat)
+                              + (glm::dot(normal, view_direction) / etai_div_etat - cos_theta_i) * normal;
 
-		normal = { 0,-1,0 };    		//法线翻转
-		cos_theta_t = -cos_theta_t;		//入射光翻转
-	}
-
-	// 计算得到透射角和反射率
-	float cos_theta_i;
-	float fr = Fresnel(etai_div_etat, cos_theta_t, cos_theta_i);
-
-	if (rng.Float01() <= fr)
-	{
-		// -- a.反射 --
-		beta *= albedo_r;
-		return glm::vec3{ -view_direction.x,view_direction.y,-view_direction.z };
-	}
-	else
-	{
-		// -- b.透射 --	
-		beta *= albedo_t;
-		return glm::vec3{ (-view_direction / etai_div_etat)
-				+ (glm::dot(normal,view_direction) / etai_div_etat - cos_theta_i) * normal }; //透射光方向
-	}
+        // 折射方向穿过表面，y 分量为负（朝法线对侧传播）
+        // delta BTDF：f = albedo_t / |cos(θ)|，pdf = 1
+        // 渲染器执行 f * |cos| / pdf = albedo_t
+        float abs_cos = std::abs(refract_dir.y);
+        return BSDFSample{
+            albedo_t / abs_cos,
+            1.0f,
+            refract_dir
+        };
+    }
 }

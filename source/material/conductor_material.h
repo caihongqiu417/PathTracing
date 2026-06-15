@@ -9,7 +9,10 @@ public:
 		:ior(ior), k(k) {
 	}
 
-	glm::vec3 SampleBSDF(const glm::vec3& hit_point, const glm::vec3& view_direction, glm::vec3& beta, const Rng& rng) const override;
+	std::optional<BSDFSample> SampleBSDF(
+		const glm::vec3& hit_point,
+		const glm::vec3& view_direction,
+		const Rng& rng) const override;
 private:
 	// 导体的折射率用复数表示：ñ = ior + ik
 	// ior（n）：复折射率实部，描述光速在介质中的减慢程度，与电介质的 IOR 含义相同
