@@ -33,6 +33,7 @@ public:
 		return { Float01(), Float01() };
 	}
 
+	
 	// 在局部上半球里随机取一个方向。
 	glm::vec3 SampleHemisphere() const
 	{

@@ -16,9 +16,9 @@ public:
 		// 选一个不平行于法线的参考向量，避免叉乘出错
 		const glm::vec3 up = std::abs(normal.y) < 0.99999f
 			? glm::vec3(0.f, 1.f, 0.f)
-			: glm::vec3(0.f, 0.f, 1.f);
+			: glm::vec3(0.f, 0.f, -1.f);
 
-		x_axis = glm::normalize(glm::cross(up, normal));
+		x_axis = glm::normalize(-glm::cross(up, normal));
 		z_axis = glm::normalize(glm::cross(x_axis, y_axis));
 	}
 

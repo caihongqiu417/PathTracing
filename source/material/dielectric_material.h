@@ -1,6 +1,7 @@
 #pragma once
 
 #include "material.h"
+#include "microfact_theory.h"
 
 //=================================================================
 // 电介质材质: 不导电的透明或半透明物质，光打到上面会同时发生反射和折射
@@ -8,14 +9,14 @@
 class DielectricMaterial :public Material
 {
 public:
-	DielectricMaterial(float ior, const glm::vec3& albedo)
-		:ior(ior),albedo_r(albedo),albedo_t(albedo)
+	DielectricMaterial(float ior, const glm::vec3& albedo,float alpha_x=0,float alpha_z=0)
+		:ior(ior), albedo_r(albedo), albedo_t(albedo), microfact_theory(alpha_x, alpha_z)
 	{
 		
 	}
 
-	DielectricMaterial(float ior, const glm::vec3& albedo_r, const glm::vec3& albedo_t)
-		:ior(ior),albedo_r(albedo_r),albedo_t(albedo_t)
+	DielectricMaterial(float ior, const glm::vec3& albedo_r, const glm::vec3& albedo_t,float alpha_x=0,float alpha_z=0)
+		:ior(ior),albedo_r(albedo_r),albedo_t(albedo_t),microfact_theory(alpha_x, alpha_z)
 	{
 		
 	}
@@ -34,4 +35,7 @@ private:
 
 	//透射时的反照率
 	glm::vec3 albedo_t;
+
+	//微表面
+	MicrofactTheory microfact_theory; //包括x轴和z轴方向的粗糙度
 };

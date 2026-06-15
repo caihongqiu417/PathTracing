@@ -1,13 +1,15 @@
 #pragma once
 
-#include"material.h"
+#include "material.h"
+#include "microfact_theory.h"
 
 class ConductorMaterial :public Material
 {
 public:
-	ConductorMaterial(const glm::vec3& ior, const glm::vec3& k)
-		:ior(ior), k(k) {
-	}
+	ConductorMaterial(const glm::vec3& ior, const glm::vec3& k,
+	                  float alpha_x = 0.f, float alpha_z = 0.f)
+		: ior(ior), k(k), microfact_theory(alpha_x, alpha_z) {}
+
 
 	std::optional<BSDFSample> SampleBSDF(
 		const glm::vec3& hit_point,
@@ -23,4 +25,5 @@ private:
 	//     铜  ior ≈ (0.2,  0.9,  1.1)  k ≈ (3.9, 2.6, 2.4)
 	glm::vec3 ior;  // 折射率实部 n
 	glm::vec3 k;    // 消光系数（折射率虚部）
+	MicrofactTheory microfact_theory;
 };

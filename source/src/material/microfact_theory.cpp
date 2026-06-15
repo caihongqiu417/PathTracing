@@ -1,4 +1,8 @@
 #include "microfact_theory.h"
+#include"util/rng.h"
+#include"sample/sphererical.h"
+#include"util/frame.h"
+
 static constexpr float PI = 3.14159265358979323846f;
 // -- 传入粗糙度 --
 MicrofactTheory::MicrofactTheory(float alpha_x, float alpha_z)
@@ -11,6 +15,10 @@ MicrofactTheory::MicrofactTheory(float alpha_x, float alpha_z)
 // -- 法线分布函数 --
 float MicrofactTheory::NormalDistribution(const glm::vec3& microfact_normal) const
 {
+	// 微表面法线朝下（或在表面上），D(m) = 0
+	if (microfact_normal.y <= 0.f)
+		return 0.f;
+
 	//根据法线计算微面斜率
 	glm::vec2 slope{ -microfact_normal.x / microfact_normal.y,-microfact_normal.z / microfact_normal.y };
 
@@ -60,6 +68,65 @@ float MicrofactTheory::HeightCorrelatedMaskingShadowing(const glm::vec3& light_d
 bool MicrofactTheory::IsDeltaDistribution() const
 {
 	return glm::max(alpha_x, alpha_z) == 1e-3f;
+}
+
+// 可见法线分布函数
+float MicrofactTheory::VisibleNormalDistribution(const glm::vec3& view_direction, const glm::vec3& microfact_normal) const
+{
+	glm::vec3 view_direction_upper = view_direction.y > 0 ? view_direction : -view_direction;
+
+	//微表面背对观察者，不可见
+	float cos_theta_o = glm::dot(view_direction_upper, microfact_normal); //观察方向与微表面法线的夹角
+	if (cos_theta_o <= 0)
+	{
+		return 0;
+	}
+	return NormalDistribution(microfact_normal) * cos_theta_o * Masking(view_direction, microfact_normal) / glm::abs(view_direction.y);
+}
+
+// 采样可见法线
+glm::vec3 MicrofactTheory::SampleVisibleNormal(const glm::vec3 &view_direction, const Rng &rng) const {
+    // 1. 确保观察方向在上半球（微表面理论要求）
+    glm::vec3 view_dir_up = view_direction.y > 0 ? view_direction : -view_direction;
+    
+    // 2. 将观察方向从各向异性空间变换到各向同性空间
+    //    这样可以用标准GGX算法采样
+    glm::vec3 view_dir_iso = glm::normalize(glm::vec3(
+        alpha_x * view_dir_up.x,
+        view_dir_up.y,
+        alpha_z * view_dir_up.z
+    ));
+    
+    // 3. 在单位圆盘上随机取一点（投影平面采样）
+    float u1 = rng.Float01();
+    float u2 = rng.Float01();
+    glm::vec2 sample = UniformSampleUnitDisk({ u1, u2 });
+    
+    // 4. 计算圆盘边缘的高度
+    float rim_height = glm::sqrt(1.f - sample.x * sample.x);
+    
+    // 5. 根据观察角度混合采样策略
+    //    垂直观察时用圆盘内部采样，掠射时用边缘采样
+    float mix = 0.5f * (1.f + view_dir_iso.y);
+    sample.y = mix * sample.y + (1.f - mix) * rim_height;
+    
+    // 6. 构建以观察方向为Z轴的局部坐标系
+    Frame local_frame(view_dir_iso);
+    
+    // 7. 将2D采样点提升到球面，得到各向同性空间的微表面法线
+    //    y = sqrt(1 - x² - z²) 保证是单位向量
+    glm::vec3 normal_iso = local_frame.WorldFromLocal({
+        sample.x,
+        glm::sqrt(1.f - sample.x * sample.x - sample.y * sample.y),
+        sample.y
+    });
+    
+    // 8. 变换回各向异性空间，得到最终法线
+    return glm::normalize(glm::vec3(
+        alpha_x * normal_iso.x,
+        normal_iso.y,
+        alpha_z * normal_iso.z
+    ));
 }
 
 // 拉伸前的斜率分布函数

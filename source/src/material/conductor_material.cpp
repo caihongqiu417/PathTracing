@@ -1,45 +1,79 @@
 #include "conductor_material.h"
-#include "complex_number.h"
+
+// 导体菲涅耳反射率（精确公式，参考 PBRT v3 §8.2）
+// 输入 cos_theta_i：wo 与微表面法线夹角的余弦
+// 返回 RGB 三通道反射率
+static glm::vec3 Fresnel(const glm::vec3& ior, const glm::vec3& k, float cos_theta_i)
+{
+    float cos2  = glm::clamp(cos_theta_i, 0.f, 1.f);
+    cos2        = cos2 * cos2;
+    float sin2  = 1.f - cos2;
+
+    glm::vec3 F;
+    for (int i = 0; i < 3; ++i)
+    {
+        float n = ior[i], kv = k[i];
+        float n2 = n * n, k2 = kv * kv;
+
+        // 求复数平方根 √(n²-k²-sin²θ + 2nk·i) = a + b·i
+        float t0   = n2 - k2 - sin2;
+        float a2b2 = glm::sqrt(t0 * t0 + 4.f * n2 * k2);  // a² + b²
+        float a    = glm::sqrt(0.5f * (a2b2 + t0));
+        float b2   = 0.5f * (a2b2 - t0);                   // b²
+
+        float cosTheta = glm::sqrt(cos2);
+
+        // s 偏振
+        float Rs = ((cosTheta - a) * (cosTheta - a) + b2) /
+                   ((cosTheta + a) * (cosTheta + a) + b2);
+
+        // p 偏振
+        float a2b2_cos2 = a2b2 * cos2;
+        float cross     = 2.f * a * cosTheta * sin2;
+        float sin4      = sin2 * sin2;
+        float Rp = Rs * (a2b2_cos2 - cross + sin4) /
+                        (a2b2_cos2 + cross + sin4);
+
+        // 非偏振光：两分量平均
+        F[i] = 0.5f * (Rs + Rp);
+    }
+    return F;
+}
 
 std::optional<BSDFSample> ConductorMaterial::SampleBSDF(
     const glm::vec3& hit_point,
     const glm::vec3& view_direction,
     const Rng& rng) const
 {
-    float cos_theta = view_direction.y;  // 局部坐标下 y 轴 = 法线方向
+    // 确保出射方向在上半球（局部坐标 y 轴 = 宏表面法线）
+    glm::vec3 wo = view_direction.y > 0.f ? view_direction : -view_direction;
 
-    // ── 计算菲涅耳反射率（RGB 三通道独立）──
-    // 导体折射率为复数 η = n + ik，每通道 n、k 不同，产生彩色金属光泽
-    glm::vec3 fresnel_reflectance{};
-    for (size_t i = 0; i < 3; i++)
-    {
-        Complex eta{ ior[i], k[i] };  // 该通道的复折射率
+    // ---------- 采样微表面法线 ----------
+    bool      is_delta = microfact_theory.IsDeltaDistribution();
+    glm::vec3 wh       = is_delta
+                         ? glm::vec3{0.f, 1.f, 0.f}
+                         : microfact_theory.SampleVisibleNormal(wo, rng);
 
-        // 斯涅尔定律推广到复数域：sin²θ_out = sin²θ_in / η²
-        float   sin2_theta_in  = 1.f - cos_theta * cos_theta;
-        Complex sin2_theta_out = sin2_theta_in / (eta * eta);
-        Complex cos_theta_out  = sqrt(Complex{1.f} - sin2_theta_out);
+    float cos_wh = glm::dot(wo, wh);
+    if (cos_wh <= 0.f) return std::nullopt;
 
-        Complex cos_in{ cos_theta };  // 入射角余弦包装为复数（虚部 = 0）
+    // ---------- 计算反射方向 ----------
+    glm::vec3 wi = 2.f * cos_wh * wh - wo;
+    if (wi.y <= 0.f) return std::nullopt;  // 反射到表面以下，无效
 
-        // Fresnel 公式：垂直 / 平行偏振分量
-        Complex r_perp = (cos_in - eta * cos_theta_out) / (cos_in + eta * cos_theta_out);
-        Complex r_parl = (eta * cos_in - cos_theta_out) / (eta * cos_in + cos_theta_out);
+    // ---------- 菲涅耳 ----------
+    glm::vec3 F     = Fresnel(ior, k, cos_wh);
+    float     cos_i = wi.y;
 
-        // 非偏振光反射率 = (|r_s|² + |r_p|²) / 2
-        fresnel_reflectance[i] = (norm(r_perp) + norm(r_parl)) * 0.5f;
-    }
+    // ---------- 光滑导体（Delta BRDF）----------
+    if (is_delta)
+        return BSDFSample{F / cos_i, 1.f, wi};
 
-    // ── 导体只有镜面反射（delta BRDF），方向唯一确定 ──
-    glm::vec3 reflect_dir = {-view_direction.x, view_direction.y, -view_direction.z};
+    // ---------- 粗糙导体（微表面 BRDF）----------
+    // VNDF 采样的权重化简为 F * G2 / G1(wo)
+    float g1_wo = microfact_theory.Masking(wo, wh);
+    float g2    = microfact_theory.HeightCorrelatedMaskingShadowing(wi, wo, wh);
+    float g2_g1 = (g1_wo > 0.f) ? g2 / g1_wo : 0.f;
 
-    float cos_reflect = reflect_dir.y;  // = cos_theta（反射不改变与法线夹角）
-
-    // delta BRDF：f = fresnel_reflectance / cos(θ)，pdf = 1
-    // 渲染器执行 f * cos / pdf = fresnel_reflectance（菲涅耳反射率即为每弹射的能量比）
-    return BSDFSample{
-        fresnel_reflectance / cos_reflect,
-        1.0f,
-        reflect_dir
-    };
+    return BSDFSample{F * g2_g1 / cos_i, 1.f, wi};
 }

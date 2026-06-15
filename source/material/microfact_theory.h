@@ -1,4 +1,7 @@
-#include<glm/glm.hpp>
+#pragma once
+
+#include <glm/glm.hpp>
+#include "util/rng.h"
 
 //==============================================================
 // 微表面模型:
@@ -35,12 +38,24 @@ public:
 	/// @param microfact_normal 微表面法线方向
 	/// @return 联合可见比例 [0, 1]，0 = 完全遮蔽或在阴影中，1 = 完全可见
 	float HeightCorrelatedMaskingShadowing(const glm::vec3& light_direction, const glm::vec3& view_direction,
-		const glm::vec3& microfact_normal);
+		const glm::vec3& microfact_normal)const;
 
 		
 	// 判断是否是Delta分布
 	//  alpha_x == alpha_z ==0 => delta distribution
 	bool IsDeltaDistribution()const;
+
+
+
+
+	// -- 重要性采样 --
+	// 可见法线分布函数
+	float VisibleNormalDistribution(const glm::vec3& view_direction,
+		const glm::vec3& microfact_normal)const;
+
+
+	// 采样可见法线
+	glm::vec3 SampleVisibleNormal(const glm::vec3& view_direction, const Rng& rng)const;
 
 private:
 	// 拉伸前的形状函数，被 NormalDistribution() 调用
