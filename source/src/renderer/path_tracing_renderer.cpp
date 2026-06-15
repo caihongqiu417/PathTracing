@@ -1,8 +1,6 @@
 #include "renderer/path_tracing_renderer.h"
 
 #include "util/frame.h"
-#include "sample/sphererical.h"
-#include <glm/gtc/constants.hpp>
 
 glm::vec3 PathTracingRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 {
@@ -14,8 +12,7 @@ glm::vec3 PathTracingRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 	glm::vec3 beta = { 1, 1, 1 };  // 当前路径的累积权重（每次弹射后衰减）
 	glm::vec3 L    = { 0, 0, 0 };  // 累积 radiance
 
-	constexpr float q  = 0.9f;              // 俄罗斯轮盘赌：继续的概率
-	constexpr float pi = glm::pi<float>();
+	constexpr float q = 0.9f;  // 俄罗斯轮盘赌：继续的概率
 
 	// -----------------------------------------------------------------------
 	// 路径追踪主循环：每轮弹射一次
@@ -40,27 +37,17 @@ glm::vec3 PathTracingRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 
 		// -- e. 计算反射方向，并更新路径权重 --
 		Frame frame(hit_info->normal);  // 以交点法线为 y 轴建立局部坐标系
-		glm::vec3 new_direction;
-
-		if (hit_info->material->is_specular)
-		{
-			// 镜面反射：方向唯一确定，直接乘反射率，不需要 brdf/pdf 公式
-			glm::vec3 view_local = frame.LocalFromWorld(-ray.direction);
-			new_direction = { -view_local.x, view_local.y, -view_local.z };
-			beta *= hit_info->material->albedo;
-		}
-		else
-		{
-			// 漫反射：余弦重要性采样
-			// pdf = cos(θ) / π，brdf = albedo / π
-			// beta *= brdf * cos / pdf = (albedo/π) * cos / (cos/π) = albedo，cos 约掉了
-			new_direction = CosineSampleHemisphere({ rng.Float01(), rng.Float01() });
-			beta *= hit_info->material->albedo;
-		}
+		glm::vec3 view_local = frame.LocalFromWorld(-ray.direction);
+		// 虚函数分派到具体材质，内部包含以下情况：
+		//   DiffuseMaterial  — 余弦重要性采样，beta *= albedo（cos/π 约掉）
+		//   SpecularMaterial — 完美镜面反射，方向唯一确定，beta *= albedo
+		glm::vec3 new_direction = hit_info->material->SampleBSDF(
+			hit_info->point, view_local, beta, rng);
 
 		// -- f. 更新光线，准备下一次弹射 --
-		ray.origin    = hit_info->point + hit_info->normal * 1e-4f;  // 沿法线偏移，避免自相交
-		ray.direction = frame.WorldFromLocal(new_direction);
+		glm::vec3 new_direction_world = frame.WorldFromLocal(new_direction);
+		ray.origin    = hit_info->point + new_direction_world * 1e-4f;  // 沿出射方向偏移，避免自相交
+		ray.direction = new_direction_world;
 	}
 
 	return L;

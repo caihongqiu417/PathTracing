@@ -4,7 +4,9 @@
 #include <glm/gtc/constants.hpp>
 #include "util/rng.h"
 
-//圆盘采样（把随机数映射成圆盘上的点）
+//  圆盘采样
+//  u.x ∈ [0, 1]  →  控制离圆心多远（r）
+// u.y ∈ [0, 1]  →  控制在哪个角度（θ）
 inline glm::vec2 UniformSampleUnitDisk(const glm::vec2& u)
 {
 	float r = glm::sqrt(u.x);	//弥补面积误差

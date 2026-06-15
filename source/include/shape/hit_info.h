@@ -1,7 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include"material.h"
+#include "material.h"
 
 // 射线打中物体后返回的信息
 struct HitInfo

@@ -11,6 +11,9 @@
 #include "shape/scene.h"
 #include "shape/sphere.h"
 #include "util/rgb.h"
+#include "diffuse_material.h"
+#include "specular_material.h"
+#include "dielectric_material.h"
 
 // =========================
 // 程序入口
@@ -23,55 +26,94 @@ int main()
 	constexpr size_t height = 1080;
 	constexpr size_t spp = 64;
 
-	// 场景：中世纪暗夜风格
-	// 配色思路：暖金烛光 vs 冷蓝月光，形成冷暖对比；龙用深朱红，地面用深灰石板
-	Model model("models/dragon_87k.obj");
 	Sphere sphere{ { 0, 0, 0 }, .5f };
-	Plane plane{ {0,0,0},{0,1,0} };
+	Plane ground{ { 0, -1, 0 }, { 0, 1, 0 } };
+	Plane back_wall{ { 0, 0, -3 }, { 0, 0, 1 } };
+	Plane glass_wall{ { 0, 0, 0 }, { -1, 0, 0 } };
 
 	Scene scene{};
 
-	// 主体：朱红色龙
-	scene.AddShape(model,
-		{ RGB{190, 45, 25} },
-		{ 0, 0, 0 }, { 1, 3, 2 });
+	// -----------------------------------------------------------------------
+	// 电介质测试场景
+	// -----------------------------------------------------------------------
 
-	// 两侧：明亮金色装饰球
-	scene.AddShape(sphere,
-		{ RGB{230, 185, 40} },
-		{ 0, 0, 2.5 });
-	scene.AddShape(sphere,
-		{ RGB{230, 185, 40} },
-		{ 0, 0, -2.5 });
+	// 地面：漫反射，透过玻璃能看到底色
+	scene.AddShape(ground,
+		std::make_shared<DiffuseMaterial>(RGB{ 80, 120, 80 }),
+		{ 0, 0, 0 });
 
-	// 两侧：镜面球
-	scene.AddShape(sphere,
-		{ {1,1,1}, true },
-		{ 3, 0.5, -2 });
-	scene.AddShape(sphere,
-		{ {1,1,1}, true },
-		{ 3, 0.5,  2 });
+	// 背景墙：漫反射，方便观察折射变形
+	scene.AddShape(back_wall,
+		std::make_shared<DiffuseMaterial>(RGB{ 180, 60, 60 }),
+		{ 0, 0, 0 });
 
-	// 主光：暖金烛光，y=3 更接近场景，地面和球都能被照亮
+	// 中央：普通玻璃 (ior = 1.5)
 	scene.AddShape(sphere,
-		{ {1,1,1}, false, {7.f, 4.f, 0.8f} },
-		{ -2, 3, 0 }, { 3, 3, 3 });
+		std::make_shared<DielectricMaterial>(1.5f, glm::vec3{ 1, 1, 1 }),
+		{ 0, 0, 0 });
 
-	// 补光：冷蓝月光，从右上方打来，和烛光形成冷暖对比
+	// 左侧：水 (ior ≈ 1.33)
 	scene.AddShape(sphere,
-		{ {1,1,1}, false, {0.6f, 1.0f, 3.5f} },
-		{ 5, 3, -3 }, { 2, 2, 2 });
+		std::make_shared<DielectricMaterial>(1.33f, glm::vec3{ 1, 1, 1 }),
+		{ -0.8f, -0.35f, 0.8f }, { 0.6f, 0.6f, 0.6f });
 
-	// 地面：中灰石板，线性值约 0.25，能明显接收光照
-	scene.AddShape(plane,
-		{ RGB{140, 130, 120} },
-		{ 0, -0.5, 0 });
+	// 右侧：高折射率玻璃 (ior = 2.0)
+	scene.AddShape(sphere,
+		std::make_shared<DielectricMaterial>(2.0f, glm::vec3{ 1, 1, 1 }),
+		{ 1.6f, -0.35f, -0.8f }, { 0.6f, 0.6f, 0.6f });
+
+	// 后方：有色玻璃（透射偏蓝）
+	scene.AddShape(sphere,
+		std::make_shared<DielectricMaterial>(
+			1.5f,
+			glm::vec3{ 1, 1, 1 },
+			glm::vec3{ 0.7f, 0.85f, 1.0f }),
+		{ 0, 0.5f, -1.2f }, { 0.5f, 0.5f, 0.5f });
+
+	// 竖直玻璃平面（暂时注释掉，先测试球体效果）
+	// scene.AddShape(glass_wall,
+	// 	std::make_shared<DielectricMaterial>(1.5f, glm::vec3{ 1, 1, 1 }),
+	// 	{ -1.5f, 0, 0 });
+
+	// 光源：放在场景上方，对所有物体都有好的可见度
+	auto light = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
+	light->SetEmissive({ 10.f, 8.f, 4.f });
+	scene.AddShape(sphere, light, { 0.f, 3.f, 1.f }, { 1.5f, 1.5f, 1.5f });
+
+	// -----------------------------------------------------------------------
+	// 原中世纪场景（暂时注释）
+	// -----------------------------------------------------------------------
+	// Model model("models/dragon_87k.obj");
+	// scene.AddShape(model,
+	// 	std::make_shared<DiffuseMaterial>(RGB{190, 45, 25}),
+	// 	{ 0, 0, 0 }, { 1, 3, 2 });
+	// scene.AddShape(sphere,
+	// 	std::make_shared<DiffuseMaterial>(RGB{230, 185, 40}),
+	// 	{ 0, 0, 2.5 });
+	// scene.AddShape(sphere,
+	// 	std::make_shared<DiffuseMaterial>(RGB{230, 185, 40}),
+	// 	{ 0, 0, -2.5 });
+	// scene.AddShape(sphere,
+	// 	std::make_shared<SpecularMaterial>(glm::vec3{1, 1, 1}),
+	// 	{ 3, 0.5, -2 });
+	// scene.AddShape(sphere,
+	// 	std::make_shared<SpecularMaterial>(glm::vec3{1, 1, 1}),
+	// 	{ 3, 0.5,  2 });
+	// auto warm_light = std::make_shared<DiffuseMaterial>(glm::vec3{1, 1, 1});
+	// warm_light->SetEmissive({ 7.f, 4.f, 0.8f });
+	// scene.AddShape(sphere, warm_light, { -2, 3, 0 }, { 3, 3, 3 });
+	// auto cool_light = std::make_shared<DiffuseMaterial>(glm::vec3{1, 1, 1});
+	// cool_light->SetEmissive({ 0.6f, 1.0f, 3.5f });
+	// scene.AddShape(sphere, cool_light, { 5, 3, -3 }, { 2, 2, 2 });
+	// scene.AddShape(plane,
+	// 	std::make_shared<DiffuseMaterial>(RGB{140, 130, 120}),
+	// 	{ 0, -0.5, 0 });
 
 	scene.Build();
 
 	// 路径追踪图
 	Film pt_film{ width, height };
-	Camera pt_camera{ pt_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	Camera pt_camera{ pt_film, { -4.f, 0.5f, 2.f }, { 0, 0, 0 }, 45.f };
 	PathTracingRenderer pt_renderer{ pt_camera, scene };
 	pt_renderer.Render(spp, "Output.ppm");
 
@@ -82,29 +124,26 @@ int main()
 	//rt_renderer.Render(spp, "Output_rt.ppm");
 
 	// Debug 热力图
-	Film bounds_test_film{ width, height };
-	Camera bounds_test_camera{ bounds_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	BoundsTestRenderer bounds_test_renderer{ bounds_test_camera, scene };
-	bounds_test_renderer.Render(4, "BoundsTest.ppm");
+	//Film bounds_test_film{ width, height };
+	//Camera bounds_test_camera{ bounds_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	//BoundsTestRenderer bounds_test_renderer{ bounds_test_camera, scene };
+	//bounds_test_renderer.Render(4, "BoundsTest.ppm");
 
-	Film triangle_test_film{ width, height };
-	Camera triangle_test_camera{ triangle_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	TriangleTestRenderer triangle_test_renderer{ triangle_test_camera, scene };
-	triangle_test_renderer.Render(4, "TriangleTest.ppm");
+	//Film triangle_test_film{ width, height };
+	//Camera triangle_test_camera{ triangle_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	//TriangleTestRenderer triangle_test_renderer{ triangle_test_camera, scene };
+	//triangle_test_renderer.Render(4, "TriangleTest.ppm");
 
-	Film bounds_depth_film{ width, height };
-	Camera bounds_depth_camera{ bounds_depth_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	BoundsDepthRenderer bounds_depth_renderer{ bounds_depth_camera, scene };
-	bounds_depth_renderer.Render(4, "BoundsDepth.ppm");
+	//Film bounds_depth_film{ width, height };
+	//Camera bounds_depth_camera{ bounds_depth_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	//BoundsDepthRenderer bounds_depth_renderer{ bounds_depth_camera, scene };
+	//bounds_depth_renderer.Render(4, "BoundsDepth.ppm");
 
 	// 法线图
-	Film normal_film{ width, height };
-	Camera normal_camera{ normal_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	NormalRenderer normal_renderer{ normal_camera, scene };
-	normal_renderer.Render(1, "Normal.ppm");
-	
-
-
+	//Film normal_film{ width, height };
+	//Camera normal_camera{ normal_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
+	//NormalRenderer normal_renderer{ normal_camera, scene };
+	//normal_renderer.Render(1, "Normal.ppm");
 
 	return 0;
 }

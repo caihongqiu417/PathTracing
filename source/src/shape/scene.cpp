@@ -5,7 +5,7 @@
 
 // 把物体放进场景，并记下模型空间和世界空间怎么互转
 
-void Scene::AddShape(const Shape& shape, const Material& material,const glm::vec3& pos, const glm::vec3& scale, const glm::vec3& rotate)
+void Scene::AddShape(const Shape& shape, std::shared_ptr<Material> material, const glm::vec3& pos, const glm::vec3& scale, const glm::vec3& rotate)
 {
 	// 模型里的点先在模型空间里
 	// 这个矩阵负责把它们放到世界空间里

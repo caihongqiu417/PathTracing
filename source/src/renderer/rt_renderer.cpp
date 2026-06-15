@@ -1,7 +1,4 @@
 #include "renderer/rt_renderer.h"
-
-#include "util/frame.h"
-#include "renderer/rt_renderer.h"
 #include "util/frame.h"
 
 glm::vec3 RTRenderer::RenderPixel(const glm::ivec2& pixel_coord)
@@ -29,27 +26,15 @@ glm::vec3 RTRenderer::RenderPixel(const glm::ivec2& pixel_coord)
 
         // 2. 累积贡献
         color += beta * hit_info->material->emissive;   // 加自发光
-        beta *= hit_info->material->albedo;             // 乘反射率
 
-        // 3. 生成新光线
-        ray.origin = hit_info->point + hit_info->normal * ray_origin_bias;  // 新起点
-
-        Frame frame(hit_info->normal);                  // 局部坐标系
-        glm::vec3 light_direction;
-
-        if (hit_info->material->is_specular)
-        {
-            // 镜面反射
-            glm::vec3 view_direction = frame.LocalFromWorld(-ray.direction);
-            light_direction = { -view_direction.x, view_direction.y, -view_direction.z };
-        }
-        else
-        {
-            // 漫反射（半球采样）
-            light_direction = rng.SampleHemisphere();
-        }
-
-        ray.direction = frame.WorldFromLocal(light_direction);  // 新方向
+        // 3. 生成新光线（材质决定方向和 beta 更新）
+        Frame frame(hit_info->normal);
+        glm::vec3 view_local = frame.LocalFromWorld(-ray.direction);
+        glm::vec3 new_direction = hit_info->material->SampleBSDF(
+            hit_info->point, view_local, beta, rng);
+        glm::vec3 new_direction_world = frame.WorldFromLocal(new_direction);
+        ray.origin = hit_info->point + new_direction_world * ray_origin_bias;
+        ray.direction = new_direction_world;
     }
 
     return color;

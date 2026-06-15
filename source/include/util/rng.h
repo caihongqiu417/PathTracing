@@ -16,25 +16,25 @@ public:
 	}
 
 	// 返回 [0, 1] 内的随机数。
-	float Float01()
+	float Float01() const
 	{
 		return uniform_01(engine);
 	}
 
 	// 返回 [-1, 1] 内的随机数，给方向采样用。
-	float FloatSigned()
+	float FloatSigned() const
 	{
 		return uniform_signed(engine);
 	}
 
 	// 给主光线一个像素内偏移，减少锯齿。
-	glm::vec2 PixelOffset()
+	glm::vec2 PixelOffset() const
 	{
 		return { Float01(), Float01() };
 	}
 
 	// 在局部上半球里随机取一个方向。
-	glm::vec3 SampleHemisphere()
+	glm::vec3 SampleHemisphere() const
 	{
 		glm::vec3 direction{};
 		do
@@ -52,9 +52,9 @@ public:
 
 private:
 	// 随机数引擎本体。
-	std::mt19937 engine;
+	mutable std::mt19937 engine;
 	// 生成 [0, 1] 的浮点数。
-	std::uniform_real_distribution<float> uniform_01{ 0.f, 1.f };
+	mutable std::uniform_real_distribution<float> uniform_01{ 0.f, 1.f };
 	// 生成 [-1, 1] 的浮点数。
-	std::uniform_real_distribution<float> uniform_signed{ -1.f, 1.f };
+	mutable std::uniform_real_distribution<float> uniform_signed{ -1.f, 1.f };
 };

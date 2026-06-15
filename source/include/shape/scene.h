@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <limits>
+#include <memory>
 #include <vector>
 
 // ShapeInstance 定义在 scene_bvh.h 中（已通过上面的 include 引入）
@@ -15,7 +16,7 @@ public:
 	// 把一个物体放进场景，并设置它在世界空间里的位置、缩放和旋转、材质
 	void AddShape(
 		const Shape& shape,
-		const Material& material = {},
+		std::shared_ptr<Material> material,
 		const glm::vec3& pos = { 0, 0, 0 },
 		const glm::vec3& scale = { 1, 1, 1 },
 		const glm::vec3& rotate = { 0, 0, 0 }

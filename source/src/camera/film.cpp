@@ -25,10 +25,11 @@ void Film::Save(const std::filesystem::path& filename)
     {
         auto pixel = GetPixel(x, y);
 
-        // 没有样本就先写黑色
+        // 曝光补偿：exposure 越大场景越亮（相当于相机快门延长）
+        constexpr float exposure = 1.5f;
         RGB rgb = pixel.sample_count == 0
             ? RGB(glm::vec3{0.f, 0.f, 0.f})
-            : RGB(pixel.color / static_cast<float>(pixel.sample_count));
+            : RGB(pixel.color / static_cast<float>(pixel.sample_count) * exposure);
 
         // 计算在缓冲区中的位置（每个像素占3字节）
         size_t idx = (y * width + x) * 3;

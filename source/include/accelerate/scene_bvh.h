@@ -2,6 +2,8 @@
 
 #include"bounds.h"
 #include"shape/shape.h"
+#include"material.h"
+#include <memory>
 
 // ============================================================
 // SceneBVH —— 场景级加速结构（第一层）
@@ -29,7 +31,7 @@
 struct ShapeInstance
 {
 	const Shape& shape;
-	Material material;  // 按值保存，避免传入临时对象时产生悬空引用
+	std::shared_ptr<Material> material;
 
 	glm::mat4 world_from_object;  // 模型空间 → 世界空间
 	glm::mat4 object_from_world;  // 世界空间 → 模型空间
@@ -62,7 +64,7 @@ struct ShapeInstance
 
 		hit->point    = glm::vec3(world_from_object * glm::vec4(hit->point, 1.f));
 		hit->normal   = glm::normalize(glm::mat3(glm::transpose(object_from_world)) * hit->normal);  // 法线用逆转置变换
-		hit->material = &material;
+		hit->material = material.get();
 		return hit;
 	}
 };
