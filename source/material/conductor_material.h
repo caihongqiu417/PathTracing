@@ -1,0 +1,23 @@
+#pragma once
+
+#include"material.h"
+
+class ConductorMaterial :public Material
+{
+public:
+	ConductorMaterial(const glm::vec3& ior, const glm::vec3& k)
+		:ior(ior), k(k) {
+	}
+
+	glm::vec3 SampleBSDF(const glm::vec3& hit_point, const glm::vec3& view_direction, glm::vec3& beta, const Rng& rng) const override;
+private:
+	// 导体的折射率用复数表示：ñ = ior + ik
+	// ior（n）：复折射率实部，描述光速在介质中的减慢程度，与电介质的 IOR 含义相同
+	// k：消光系数（extinction coefficient），复折射率虚部，描述光在介质内被吸收的速率
+	//      k 越大，材质对光的吸收越强，颜色越深、表面越不透明
+	// 两者都是 vec3，对 RGB 三通道分别取值，这样才能表现出金、铜等金属的彩色反射
+	// 例：金  ior ≈ (0.17, 0.35, 1.5)  k ≈ (3.1, 2.4, 1.9)
+	//     铜  ior ≈ (0.2,  0.9,  1.1)  k ≈ (3.9, 2.6, 2.4)
+	glm::vec3 ior;  // 折射率实部 n
+	glm::vec3 k;    // 消光系数（折射率虚部）
+};

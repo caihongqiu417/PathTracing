@@ -14,6 +14,7 @@
 #include "diffuse_material.h"
 #include "specular_material.h"
 #include "dielectric_material.h"
+#include "conductor_material.h"
 
 // =========================
 // 程序入口
@@ -74,6 +75,34 @@ int main()
 	// scene.AddShape(glass_wall,
 	// 	std::make_shared<DielectricMaterial>(1.5f, glm::vec3{ 1, 1, 1 }),
 	// 	{ -1.5f, 0, 0 });
+
+	// -----------------------------------------------------------------------
+	// 导体测试场景（紧靠电介质球右侧，便于对比）
+	// -----------------------------------------------------------------------
+
+	// 导体球：沿 x 轴展开（-2 / 0 / +2），抬高到 y=1 浮于玻璃球上方
+	// z=0 与玻璃球同深度，避免和相机 z=2 挤在一起
+
+	// 红：只有 R 通道高反射
+	scene.AddShape(sphere,
+		std::make_shared<ConductorMaterial>(
+			glm::vec3{ 0.2f, 1.0f, 1.0f },
+			glm::vec3{ 3.5f, 0.1f, 0.1f }),
+		{ -2.f, 1.f, 0.f });
+
+	// 绿：只有 G 通道高反射
+	scene.AddShape(sphere,
+		std::make_shared<ConductorMaterial>(
+			glm::vec3{ 1.0f, 0.2f, 1.0f },
+			glm::vec3{ 0.1f, 3.5f, 0.1f }),
+		{ 0.f, 1.f, 0.f });
+
+	// 蓝：只有 B 通道高反射
+	scene.AddShape(sphere,
+		std::make_shared<ConductorMaterial>(
+			glm::vec3{ 1.0f, 1.0f, 0.2f },
+			glm::vec3{ 0.1f, 0.1f, 3.5f }),
+		{ 2.f, 1.f, 0.f });
 
 	// 光源：放在场景上方，对所有物体都有好的可见度
 	auto light = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
