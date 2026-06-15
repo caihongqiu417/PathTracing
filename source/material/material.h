@@ -40,7 +40,7 @@ public:
     // 参数：hit_point      交点位置（世界空间）
     //       view_direction  出射方向（局部坐标，指向观察者）
     //       rng             随机数生成器
-    // 返回：BSDFSample，或 nullopt（采样退化时，如折射超过临界角）
+    // 返回：BSDFSample，或 nullopt（如折射超过临界角）
     virtual std::optional<BSDFSample> SampleBSDF(
         const glm::vec3& hit_point,
         const glm::vec3& view_direction,
