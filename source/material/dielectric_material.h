@@ -26,6 +26,12 @@ public:
 		const glm::vec3& view_direction,
 		const Rng& rng) const override;
 
+	glm::vec3 BSDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const override;
+
+
+    // Delta分布: 只有一个反射方向
+	virtual bool IsDeltaDistribution()const override { return microfact_theory.IsDeltaDistribution(); }
+
 private:
 	//折射率
 	float ior;

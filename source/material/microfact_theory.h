@@ -57,6 +57,8 @@ public:
 	// 采样可见法线
 	glm::vec3 SampleVisibleNormal(const glm::vec3& view_direction, const Rng& rng)const;
 
+
+
 private:
 	// 拉伸前的形状函数，被 NormalDistribution() 调用
 	// D(m) = P22(slope) / cos⁴(θh)，其中 slope = (-wh.x/wh.y, -wh.z/wh.y)

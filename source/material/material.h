@@ -37,16 +37,29 @@ struct BSDFSample
 class Material
 {
 public:
-    // 采样 BSDF
-    // 参数：hit_point      交点位置（世界空间）
-    //       view_direction  出射方向（局部坐标，指向观察者）
-    //       rng             随机数生成器
-    // 返回：BSDFSample，或 nullopt（如折射超过临界角）
+    // ── BSDF 采样（间接光 / 路径追踪）──────────────────────────────
+    // 按材质分布重要性采样一个入射方向 ωi，返回 BSDFSample
+    // 用途：路径追踪延伸下一段光线
+    // 返回 nullopt 表示该方向无贡献（如折射全内反射）
     virtual std::optional<BSDFSample> SampleBSDF(
-        const glm::vec3& hit_point,
-        const glm::vec3& view_direction,
+        const glm::vec3& hit_point,      // 交点位置（世界空间，用于纹理 / 切线空间）
+        const glm::vec3& view_direction, // 出射方向 ωo（局部坐标，y 轴 = 法线，指向观察者）
         const Rng& rng) const = 0;
 
-    //表明这个材质属于这个面光源
+    // ── BSDF 评估（直接光照 / 光源采样）────────────────────────────
+    // 给定已知入射方向 ωi（由光源采样得到），返回 f(ωi, ωo)
+    // 用途：直接光照中计算光源方向的 BSDF 贡献
+    // Delta 材质（镜面等）始终返回 0，因为任意指定的 ωi 几乎不可能等于精确反射方向
+    virtual glm::vec3 BSDF(
+        const glm::vec3& hit_point,      // 交点位置（局部坐标系构建用）
+        const glm::vec3& light_direction,// 入射方向 ωi（表面 → 光源）
+        const glm::vec3& view_direction  // 出射方向 ωo（表面 → 观察者）
+    ) const = 0;
+
+    // Delta 分布：只有唯一一个合法入射方向（镜面 / 电介质 / 导体）
+    // 积分器据此跳过直接光照的 BSDF 评估，只走 SampleBSDF 路径
+    virtual bool IsDeltaDistribution() const = 0;
+
+    // 该材质所属的面光源（nullptr 表示不发光）
     const AreaLight* area_light{ nullptr };
 };

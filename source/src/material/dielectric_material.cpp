@@ -20,6 +20,79 @@ static float Fresnel(float eta, float cos_o, float& cos_t)
     return (r_parl * r_parl + r_perp * r_perp) * 0.5f;
 }
 
+// 粗糙电介质 BSDF（用于直接光照，已知 ωi）
+// 根据 ωi 和 ωo 是否同侧，分反射和透射两种情况评估
+// Delta 电介质（光滑玻璃）始终返回 0
+glm::vec3 DielectricMaterial::BSDF(const glm::vec3& hit_point,
+    const glm::vec3& light_direction,
+    const glm::vec3& view_direction) const
+{
+    if (microfact_theory.IsDeltaDistribution())
+        return glm::vec3(0.f);
+
+    bool entering = view_direction.y > 0.f;
+    float eta     = entering ? ior : (1.f / ior);  // η_t / η_i
+
+    glm::vec3 wo_upper = entering ? view_direction : -view_direction;
+
+    // ωi 与 ωo 同侧 → 反射；异侧 → 透射
+    bool is_reflection = (light_direction.y > 0.f) == (view_direction.y > 0.f);
+
+    if (is_reflection)
+    {
+        // 反射半向量
+        glm::vec3 wi_upper = entering ? light_direction : -light_direction;
+        if (wi_upper.y <= 0.f) return glm::vec3(0.f);
+
+        glm::vec3 wh = glm::normalize(wi_upper + wo_upper);
+        if (wh.y <= 0.f) return glm::vec3(0.f);
+
+        float cos_o = glm::dot(wo_upper, wh);
+        if (cos_o <= 0.f) return glm::vec3(0.f);
+
+        float cos_t_unused;
+        float F  = Fresnel(eta, cos_o, cos_t_unused);
+        float D  = microfact_theory.NormalDistribution(wh);
+        float G2 = microfact_theory.HeightCorrelatedMaskingShadowing(wi_upper, wo_upper, wh);
+
+        float cos_wi = wi_upper.y;
+        float cos_wo = wo_upper.y;
+        if (cos_wi <= 0.f || cos_wo <= 0.f) return glm::vec3(0.f);
+
+        // f_r = albedo_r · F · D · G2 / (4 · cosωi · cosωo)
+        return albedo_r * F * D * G2 / (4.f * cos_wi * cos_wo);
+    }
+    else
+    {
+        // 透射方向在另一侧，翻转到上半球
+        glm::vec3 wi_upper = entering ? -light_direction : light_direction;
+        if (wi_upper.y <= 0.f) return glm::vec3(0.f);
+
+        // 透射半向量：指向入射侧，wh = normalize(ωo + η·ωi_upper)
+        glm::vec3 wh = glm::normalize(wo_upper + eta * wi_upper);
+        if (wh.y <= 0.f) wh = -wh;  // 保证半向量在上半球
+
+        float cos_o = glm::dot(wo_upper, wh);
+        float cos_i = glm::dot(wi_upper, wh);
+        if (cos_o <= 0.f || cos_i <= 0.f) return glm::vec3(0.f);
+
+        float cos_t;
+        float F  = Fresnel(eta, cos_o, cos_t);
+        float D  = microfact_theory.NormalDistribution(wh);
+        float G2 = microfact_theory.HeightCorrelatedMaskingShadowing(wi_upper, wo_upper, wh);
+
+        float cos_wi = wi_upper.y;
+        float cos_wo = wo_upper.y;
+        if (cos_wi <= 0.f || cos_wo <= 0.f) return glm::vec3(0.f);
+
+        // f_t = albedo_t · (1-F) · D · G2 · η² · cosωi_h · cosωo_h
+        //       / (cosωi · cosωo · (cosωo_h + η·cosωi_h)²)
+        float denom = cos_o + eta * cos_i;
+        return albedo_t * (1.f - F) * D * G2 * eta * eta * cos_i * cos_o
+               / (cos_wi * cos_wo * denom * denom);
+    }
+}
+
 std::optional<BSDFSample> DielectricMaterial::SampleBSDF(
     const glm::vec3& hit_point,
     const glm::vec3& view_direction,

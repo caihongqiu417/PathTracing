@@ -40,6 +40,38 @@ static glm::vec3 Fresnel(const glm::vec3& ior, const glm::vec3& k, float cos_the
     return F;
 }
 
+// 粗糙导体 BRDF（用于直接光照，已知 ωi）
+// f(ωi,ωo) = F(cos_wh) · D(wh) · G2(ωi,ωo,wh) / (4 · cosωi · cosωo)
+// wh = normalize(ωi + ωo)（反射半向量）
+// Delta 导体（光滑镜面）始终返回 0，因为任意给定的 ωi 几乎不可能命中精确反射方向
+glm::vec3 ConductorMaterial::BSDF(const glm::vec3& hit_point,
+    const glm::vec3& light_direction,
+    const glm::vec3& view_direction) const
+{
+    if (microfact_theory.IsDeltaDistribution())
+        return glm::vec3(0.f);
+
+    // 两方向都须在上半球
+    glm::vec3 wo = view_direction.y  > 0.f ? view_direction  : -view_direction;
+    glm::vec3 wi = light_direction.y > 0.f ? light_direction : -light_direction;
+
+    glm::vec3 wh = glm::normalize(wi + wo);
+    if (wh.y <= 0.f) return glm::vec3(0.f);
+
+    float cos_wh = glm::dot(wo, wh);
+    if (cos_wh <= 0.f) return glm::vec3(0.f);
+
+    float cos_wi = wi.y;
+    float cos_wo = wo.y;
+    if (cos_wi <= 0.f || cos_wo <= 0.f) return glm::vec3(0.f);
+
+    glm::vec3 F = Fresnel(ior, k, cos_wh);
+    float     D = microfact_theory.NormalDistribution(wh);
+    float    G2 = microfact_theory.HeightCorrelatedMaskingShadowing(wi, wo, wh);
+
+    return F * D * G2 / (4.f * cos_wi * cos_wo);
+}
+
 std::optional<BSDFSample> ConductorMaterial::SampleBSDF(
     const glm::vec3& hit_point,
     const glm::vec3& view_direction,
