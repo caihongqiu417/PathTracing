@@ -2,7 +2,8 @@
 
 #include<vector>
 
-// Build O(n)，Sample O(1) 根据光源的功率大小，重要性采样光源
+// 别名表：给定权重数组（如 [1, 2, 3]），构建一个表，之后每次采样只需 O(1) 时间，按权重比例随机返回一个下标。
+// Build O(n)，Sample O(1) 
 //
 // 示例：weights=[1,2,3]，n=3，归一化 probs=[1/6, 2/6, 3/6]
 // Build：缩放 p[i]=probs[i]*n -> [0.5, 1.0, 1.5]，item0(Less) 用 item2(Greater) 填满
@@ -27,8 +28,8 @@ private:
 public:
 	struct SampleResult
 	{
-		int   index; // 采样到的事件下标
-		float u;     // 原始随机数，供外部复用（如 MIS 权重计算）
+		int   index;  // 采样到的事件下标
+		float prob;   // 采样到的事件的归一化概率 probs[index]
 	};
 
 	AliasTable() = default;
@@ -36,7 +37,7 @@ public:
 	// 按 values 的权重比例构建别名表
 	void Build(const std::vector<float>& values);
 
-	// u 为 [0,1) 均匀随机数，返回按权重采样的事件下标及原始 u
+	// u 为 [0,1) 均匀随机数，返回按权重采样的事件下标及该事件的归一化概率
 	SampleResult Sample(float u) const;
 
 private:

@@ -29,6 +29,10 @@ struct Plane : public Shape
 
 	std::optional<HitInfo> Intersect(const Ray& ray, float t_min, float t_max) const override;
 
+	float GetArea()const override;
+
+	std::optional<ShapeSample> SampleShape(Rng& rng)const override;
+
 	glm::vec3 point;            // 圆心（世界坐标）
 	glm::vec3 normal;           // 法线（世界坐标，已归一化）
 	glm::vec3 x_axis, z_axis;   // 盘面内的局部坐标轴

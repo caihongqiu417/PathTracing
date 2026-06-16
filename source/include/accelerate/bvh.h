@@ -2,6 +2,7 @@
 
 #include"bounds.h"
 #include"shape/triangle.h"
+#include"sample/alias_table.h"
 
 // ============================================================
 // BVH —— 模型内部加速结构（第二层）
@@ -117,6 +118,11 @@ public:
 
 	Bounds GetBounds() const override { return nodes.empty() ? Bounds{} : nodes[0].bounds; }
 
+	float GetArea()const override { return area; }
+
+	//
+	virtual std::optional<ShapeSample> SampleShape(Rng& rng)const override;
+
 private:
 	void   DeleteNode(BVHTreeNode* node);
 	void   RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocator& allocator);
@@ -125,4 +131,7 @@ private:
 private:
 	std::vector<BVHNode>   nodes;             // 线性 BVH 数组，遍历时使用
 	std::vector<Triangle>  ordered_triangles; // 按叶子顺序排列的三角形列表
+
+	float area;
+	AliasTable alias_table;
 };

@@ -27,6 +27,7 @@ inline glm::vec3 CosineSampleHemisphere(const glm::vec2& u)
     return glm::normalize(glm::vec3(disk.x, y, disk.y));
 }
 
+// 均匀采样上半球
 inline glm::vec3 UniformSampleHemisphere(Rng& rng) {
     glm::vec3 result;
     do {
@@ -36,5 +37,15 @@ inline glm::vec3 UniformSampleHemisphere(Rng& rng) {
     if (result.y < 0) {
         result.y = -result.y;
     }
+    return glm::normalize(result);
+}
+
+// 均匀采样球面
+inline glm::vec3 UniformSampleSphere(Rng& rng) {
+    glm::vec3 result;
+    do {
+        result = { rng.Float01(), rng.Float01(), rng.Float01() };
+        result = result * 2.f - 1.f;
+    } while (glm::length(result) > 1);
     return glm::normalize(result);
 }

@@ -23,8 +23,11 @@ struct Triangle : public Shape {
 	}
 
 
-	//相交测试
 	std::optional<HitInfo> Intersect(const Ray& ray, float t_min, float t_max)const override;
+
+	float GetArea()const override;
+
+	std::optional<ShapeSample> SampleShape(Rng& rng)const override;
 
 	Bounds GetBounds()const override {
 		Bounds bounds{};

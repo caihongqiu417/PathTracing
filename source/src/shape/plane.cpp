@@ -1,4 +1,5 @@
 #include "plane.h"
+#include"sample/sphererical.h"
 
 #include <cmath>
 
@@ -23,4 +24,21 @@ std::optional<HitInfo> Plane::Intersect(const Ray& ray, float t_min, float t_max
 		return {};
 
 	return HitInfo{ hit_t, hit_point, normal };
+}
+
+float Plane::GetArea() const
+{
+	constexpr float PI = 3.141592653589793;
+	return PI * radius * radius;
+}
+
+std::optional<ShapeSample> Plane::SampleShape(Rng& rng) const
+{
+	// 生成采样点（局部坐标系中）
+	glm::vec2 sample_local = UniformSampleUnitDisk({ rng.Float01(), rng.Float01() });
+
+	// 采样点转换到世界坐标
+	glm::vec3 sample_point = point + sample_local.x * x_axis + sample_local.y * z_axis;
+
+	return ShapeSample{ sample_point,normal,1.f / GetArea() };
 }

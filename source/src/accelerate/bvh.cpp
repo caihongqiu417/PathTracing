@@ -48,9 +48,34 @@ void BVH::Build(std::vector<Triangle>&& triangles)
 
 	//BVH树结构=>BVH线性结构
 	RecursiveFlatten(root);
+
+	//初始化表面积和别名表（用于向光源采样）
+	area = 0;
+	std::vector<float> areas;
+	areas.reserve(ordered_triangles.size());
+	for (const auto& triangle : ordered_triangles)
+	{
+		areas.push_back(triangle.GetArea());
+		area += areas.back();
+	}
+	alias_table.Build(areas);
 }
 
 
+
+std::optional<ShapeSample> BVH::SampleShape(Rng& rng) const
+{
+	//在别名表中根据面积权重采样一个三角形a
+	auto sample_result = alias_table.Sample(rng.Float01());
+	const auto& triangle = ordered_triangles[sample_result.index];
+
+	//在三角性内部调用SampleShape,采样三角形a的一个点
+	auto triangle_sample = triangle.SampleShape(rng);
+
+	return ShapeSample{ triangle_sample->point,triangle_sample->normal,
+						triangle_sample->pdf * sample_result.prob }; //prob表示在model bvh采样到这个三角形a的概率
+
+}
 
 void BVH::RecursiveSplit(BVHTreeNode* node, BVHState& state, BVHTreeNodeAllocator& allocator)
 {

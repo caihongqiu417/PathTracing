@@ -1,6 +1,7 @@
 #include "sphere.h"
 
 #include "hit_info.h"
+#include"sample/sphererical.h"
 
 #include <cmath>
 
@@ -33,4 +34,22 @@ std::optional<HitInfo> Sphere::Intersect(const Ray& ray, float t_min, float t_ma
 	glm::vec3 point = ray.Hit(hit_t);
 	glm::vec3 normal = glm::normalize(point - center);
 	return HitInfo{ hit_t, point, normal };
+}
+
+float Sphere::GetArea() const
+{
+	constexpr float PI = 3.141592653589793;
+	return 4 * PI * radius * radius;
+}
+
+std::optional<ShapeSample> Sphere::SampleShape(Rng& rng) const
+{
+	// 在单位球面上均匀采样一个方向，作为采样点的法线
+	glm::vec3 normal = UniformSampleSphere(rng);
+
+	// 采样点 = 球心 + 法线方向 * 半径（世界坐标）
+	glm::vec3 point = center + normal * radius;
+
+	// 均匀采样球面，pdf = 1 / 表面积
+	return ShapeSample{ point, normal, 1.f / GetArea() };
 }
