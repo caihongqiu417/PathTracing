@@ -2,6 +2,7 @@
 
 #include <optional>
 #include "util/rng.h"
+class AreaLight;
 #include <glm/glm.hpp>
 
 // =============================================================
@@ -46,6 +47,6 @@ public:
         const glm::vec3& view_direction,
         const Rng& rng) const = 0;
 
-    void SetEmissive(const glm::vec3& e) { emissive = e; }
-    glm::vec3 emissive{};
+    //表明这个材质属于这个面光源
+    const AreaLight* area_light{ nullptr };
 };

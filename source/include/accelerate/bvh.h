@@ -120,7 +120,6 @@ public:
 
 	float GetArea()const override { return area; }
 
-	//
 	virtual std::optional<ShapeSample> SampleShape(Rng& rng)const override;
 
 private:
