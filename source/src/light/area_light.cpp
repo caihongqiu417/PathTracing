@@ -36,12 +36,11 @@ std::optional<LightSample> AreaLight::SampleLight(const glm::vec3& surface_point
 }
 
 
-glm::vec3 AreaLight::GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point,const glm::vec3& normal) const
+glm::vec3 AreaLight::GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal) const
 {
-	// 如果是单面光源，且光照方向与法线夹角 >= 90°（背面），不发光
+	// 单面光源从背面看不发光：surface_point 在法线反面时返回 0
     if ((!double_side) && (glm::dot(surface_point - light_point, normal) <= 0))
-    {
-        return {};  
-    }
+        return glm::vec3(0.f);
 
+    return Le;
 }

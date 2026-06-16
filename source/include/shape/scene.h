@@ -26,11 +26,16 @@ public:
 	);
 
 	// 添加面光源：将光源绑定到材质，注册几何体，并加入光源采样器
-	void AddAreaLight(const AreaLight* area_light, std::shared_ptr<Material> material)
+	void AddAreaLight(
+		const AreaLight* area_light,
+		std::shared_ptr<Material> material,
+		const glm::vec3& pos    = { 0, 0, 0 },
+		const glm::vec3& scale  = { 1, 1, 1 },
+		const glm::vec3& rotate = { 0, 0, 0 })
 	{
-		material->area_light = area_light;       
-		AddShape(area_light->GetShape(), material); 
-		light_sampler.AddLight(area_light);         
+		material->area_light = area_light;
+		AddShape(area_light->GetShape(), material, pos, scale, rotate);
+		light_sampler.AddLight(area_light);
 	}
 
 	// 添加无限光源

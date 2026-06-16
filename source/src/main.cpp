@@ -15,6 +15,7 @@
 #include "specular_material.h"
 #include "dielectric_material.h"
 #include "conductor_material.h"
+#include "light/area_light.h"
 
 // =========================
 // 程序入口
@@ -28,9 +29,9 @@ int main()
 	constexpr size_t spp = 64;
 
 	Sphere sphere{ { 0, 0, 0 }, .5f };
-	Plane ground{ { 0, -1, 0 }, { 0, 1, 0 } };
-	Plane back_wall{ { 0, 0, -3 }, { 0, 0, 1 } };
-	Plane glass_wall{ { 0, 0, 0 }, { -1, 0, 0 } };
+	Plane ground{ { 0, -1, 0 }, { 0, 1, 0 }, 20.f };
+	Plane back_wall{ { 0, 0, -3 }, { 0, 0, 1 }, 20.f };
+	Plane glass_wall{ { 0, 0, 0 }, { -1, 0, 0 }, 20.f };
 
 	Scene scene{};
 
@@ -109,9 +110,9 @@ int main()
 		{ 2.f, 1.f, 0.f });
 
 	// 光源：放在场景上方，对所有物体都有好的可见度
-	auto light = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
-	light->SetEmissive({ 10.f, 8.f, 4.f });
-	scene.AddShape(sphere, light, { 0.f, 3.f, 1.f }, { .5f, .5f, .5f });
+	AreaLight area_light{ sphere, { 10.f, 8.f, 4.f }, false };
+	auto light_mat = std::make_shared<DiffuseMaterial>(glm::vec3{ 1.f, 1.f, 1.f });
+	scene.AddAreaLight(&area_light, light_mat, { 0.f, 3.f, 1.f }, { .5f, .5f, .5f });
 
 	// -----------------------------------------------------------------------
 	// 原中世纪场景（暂时注释）

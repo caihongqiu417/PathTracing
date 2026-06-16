@@ -16,7 +16,7 @@ void LightSampler::Build(float scene_radius)
 
 std::optional<LightSourceSample> LightSampler::Sample(float u)const {
 	if (lights.empty())
-		return;
+		return std::nullopt;
 
 	auto sample_result = alias_table.Sample(u);
 	return LightSourceSample{ lights[sample_result.index],sample_result.prob };

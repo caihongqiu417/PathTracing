@@ -13,10 +13,10 @@ float InfiniteLight::Phi(float scene_radius) const
 // 均匀球面采样的立体角 PDF = 1 / (4π)
 std::optional<LightSample> InfiniteLight::SampleLight(const glm::vec3& surface_point, float scene_radius, Rng& rng) const
 {
-    // 均匀采样整个球面，得到入射方向
+    // 直接在立体角采样，不需要雅可比转换
     glm::vec3 direction = UniformSampleSphere(rng);
 
-    // 光源点放在包围球表面（沿该方向的远端）
+    // 光源点放在包围球表面沿该方向的远端
     glm::vec3 light_point = surface_point + direction * (2.f * scene_radius);
 
     // 均匀球面采样：pdf = 1 / (4π)

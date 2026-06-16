@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>为什么需要 MIS</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; background: #12121e; color: #ddd; padding: 24px; max-width: 900px; margin: auto; line-height: 1.7; }
+  h1 { color: #e0c96e; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h2 { color: #6bb5ff; margin-top: 36px; }
+  h3 { color: #aaa; }
+  .scene { background: #0d0d1a; border: 1px solid #2a2a44; border-radius: 8px; margin: 16px 0; padding: 4px; }
+  .card { background: #16213e; border-left: 4px solid #e0c96e; padding: 12px 16px; margin: 12px 0; border-radius: 4px; font-size: 14px; }
+  .card.red { border-left-color: #ff6b6b; }
+  .card.green { border-left-color: #6bffb0; }
+  .card.blue { border-left-color: #6bb5ff; }
+  .formula { background: #0d0d1a; border: 1px solid #333; padding: 10px 16px; border-radius: 4px; font-family: monospace; font-size: 15px; color: #e0c96e; margin: 8px 0; }
+  .cols { display: flex; gap: 16px; }
+  .col { flex: 1; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; }
+  .tag.bad { background: #ff6b6b33; color: #ff6b6b; border: 1px solid #ff6b6b55; }
+  .tag.ok  { background: #6bffb033; color: #6bffb0; border: 1px solid #6bffb055; }
+  svg text { font-family: "Microsoft YaHei", sans-serif; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th { background: #1a2040; color: #6bb5ff; padding: 8px; text-align: left; }
+  td { padding: 7px 8px; border-bottom: 1px solid #222; }
+  tr:hover td { background: #1a1a2e; }
+</style>
+</head>
+<body>
+
+<h1>为什么需要多重重要性采样（MIS）</h1>
+
+<!-- ============================================================ -->
+<h2>一、当前算法的问题</h2>
+
+<p>当前代码对漫反射面做 <b>NEE（直接光采样）</b>，对 delta 材质做 <b>BSDF 采样</b>，两者互斥。这会导致两类场景出问题：</p>
+
+<!-- 问题 1：NEE 高方差 -->
+<h3>问题 1：光源很小 + 材质是光滑镜面 → NEE 高方差</h3>
+<div class="scene">
+<svg width="860" height="200">
+  <!-- 小光源 -->
+  <ellipse cx="780" cy="40" rx="16" ry="10" fill="#ffe066"/>
+  <text x="760" y="70" fill="#ffe066" font-size="12">小光源</text>
+
+  <!-- 漫反射面 -->
+  <rect x="60" y="150" width="700" height="10" fill="#5588aa" rx="2"/>
+  <text x="240" y="175" fill="#5588aa" font-size="12">粗糙表面（窄 BSDF 波瓣）</text>
+
+  <!-- BSDF 波瓣示意 -->
+  <ellipse cx="300" cy="148" rx="18" ry="60" fill="#6bb5ff22" stroke="#6bb5ff44" stroke-width="1" transform="rotate(-15 300 148)"/>
+  <text x="200" y="100" fill="#6bb5ff" font-size="12">BSDF 波瓣集中在</text>
+  <text x="200" y="114" fill="#6bb5ff" font-size="12">反射方向附近</text>
+
+  <!-- NEE 采样方向（不在波瓣内，贡献接近0）-->
+  <line x1="300" y1="150" x2="780" y2="45" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="480" y="80" fill="#ff6b6b" font-size="12">NEE 采到光源</text>
+  <text x="480" y="95" fill="#ff6b6b" font-size="12">但 BSDF(wi,wo) ≈ 0</text>
+  <text x="480" y="110" fill="#ff6b6b" font-size="12">贡献 ≈ 0，大量采样浪费</text>
+
+  <!-- 正确方向（波瓣内但没有光源）-->
+  <line x1="300" y1="150" x2="330" y2="60" stroke="#6bb5ff" stroke-width="2"/>
+  <text x="310" y="55" fill="#6bb5ff" font-size="12">BSDF 采样方向</text>
+  <text x="310" y="68" fill="#6bb5ff" font-size="12">（无光源，贡献=0）</text>
+</svg>
+</div>
+<div class="card red">
+  <b>NEE 的问题</b>：光源方向上 BSDF 值接近 0（光源不在反射波瓣内），每次 NEE 采样都白费。
+  渲染结果：噪点极多，收敛极慢。
+</div>
+
+<!-- 问题 2：BSDF 高方差 -->
+<h3>问题 2：光源很小 → BSDF 采样命中概率低</h3>
+<div class="scene">
+<svg width="860" height="200">
+  <!-- 小光源 -->
+  <ellipse cx="600" cy="40" rx="8" ry="6" fill="#ffe066"/>
+  <text x="580" y="65" fill="#ffe066" font-size="12">极小光源</text>
+
+  <!-- 漫反射面 -->
+  <rect x="60" y="150" width="700" height="10" fill="#5588aa" rx="2"/>
+
+  <!-- BSDF 大量方向（大多数不命中） -->
+  <line x1="350" y1="150" x2="200" y2="30" stroke="#6bb5ff44" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="350" y1="150" x2="280" y2="20" stroke="#6bb5ff44" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="350" y1="150" x2="420" y2="15" stroke="#6bb5ff44" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="350" y1="150" x2="500" y2="25" stroke="#6bb5ff44" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="350" y1="150" x2="700" y2="40" stroke="#6bb5ff44" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="100" y="115" fill="#6bb5ff88" font-size="12">大量 BSDF 采样方向，都没打到光源</text>
+
+  <!-- 偶尔命中 -->
+  <line x1="350" y1="150" x2="600" y2="43" stroke="#6bffb0" stroke-width="2.5"/>
+  <text x="440" y="85" fill="#6bffb0" font-size="12">偶尔命中！→ 极高亮点</text>
+  <text x="440" y="100" fill="#ff6b6b" font-size="12">其余都是 0 → 萤火虫噪点</text>
+</svg>
+</div>
+<div class="card red">
+  <b>BSDF 采样的问题</b>：漫反射随机方向几乎不可能命中极小的光源，
+  偶尔命中时贡献极大（因为 pdf 很低），产生<b>萤火虫（firefly）噪点</b>。
+</div>
+
+<!-- 问题 3：当前代码丢失能量 -->
+<h3>问题 3：当前代码对漫反射完全丢弃 BSDF 命中光源的贡献</h3>
+<div class="scene">
+<svg width="860" height="180">
+  <!-- 光源 -->
+  <ellipse cx="650" cy="40" rx="30" ry="18" fill="#ffe066" opacity="0.9"/>
+  <text x="630" y="70" fill="#ffe066" font-size="12">光源</text>
+
+  <!-- 漫反射面 -->
+  <rect x="60" y="140" width="700" height="10" fill="#5588aa" rx="2"/>
+
+  <!-- NEE（成功） -->
+  <line x1="300" y1="140" x2="636" y2="55" stroke="#6bffb0" stroke-width="2"/>
+  <text x="380" y="80" fill="#6bffb0" font-size="12">NEE ✓ 加入 L</text>
+
+  <!-- BSDF 采样恰好命中光源（被丢弃） -->
+  <line x1="300" y1="140" x2="640" y2="52" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="140" y="120" fill="#ff6b6b" font-size="12">BSDF 采样恰好也打到光源</text>
+  <text x="140" y="135" fill="#ff6b6b" font-size="12">last_is_specular=false → 不算 ✗ → 能量丢失！</text>
+</svg>
+</div>
+<div class="card red">
+  <b>当前代码的 bug</b>：漫反射面 BSDF 采样如果恰好命中光源，
+  因为 <code>last_is_specular=false</code> 而完全不计入，这段贡献就丢失了。
+  正确做法是用 MIS 权重把它算进去，而不是扔掉。
+</div>
+
+<!-- ============================================================ -->
+<h2>二、MIS 的思路</h2>
+
+<p>MIS 的核心思想：<b>同时使用两种采样策略，每个样本按"它在这个策略下有多好"来加权</b>，既不丢弃任何贡献，也不重复计算。</p>
+
+<div class="scene">
+<svg width="860" height="220">
+  <!-- 光源 -->
+  <ellipse cx="700" cy="45" rx="25" ry="15" fill="#ffe066" opacity="0.9"/>
+  <text x="678" y="72" fill="#ffe066" font-size="12">光源</text>
+
+  <!-- 漫反射面 -->
+  <rect x="60" y="170" width="700" height="10" fill="#5588aa" rx="2"/>
+  <text x="250" y="195" fill="#5588aa" font-size="12">漫反射表面 p</text>
+
+  <!-- BSDF 波瓣 -->
+  <ellipse cx="350" cy="168" rx="20" ry="70" fill="#6bb5ff11" stroke="#6bb5ff33" stroke-width="1" transform="rotate(-10 350 168)"/>
+
+  <!-- NEE 样本 -->
+  <line x1="350" y1="170" x2="690" y2="57" stroke="#6bffb0" stroke-width="2.5"/>
+  <circle cx="690" cy="57" r="4" fill="#6bffb0"/>
+  <text x="490" y="95" fill="#6bffb0" font-size="12">NEE 样本 x_l</text>
+  <text x="490" y="110" fill="#6bffb0" font-size="12">权重 w_l = p_l / (p_l + p_b)</text>
+
+  <!-- BSDF 样本（也命中光源） -->
+  <line x1="350" y1="170" x2="680" y2="53" stroke="#e0c96e" stroke-width="2" stroke-dasharray="6,3"/>
+  <circle cx="680" cy="53" r="4" fill="#e0c96e"/>
+  <text x="130" y="120" fill="#e0c96e" font-size="12">BSDF 样本 x_b（恰好命中光源）</text>
+  <text x="130" y="135" fill="#e0c96e" font-size="12">权重 w_b = p_b / (p_l + p_b)</text>
+
+  <!-- 两者相加 -->
+  <text x="280" y="155" fill="#fff" font-size="12">L = w_l · f·Le·cos/p_l  +  w_b · f·Le·cos/p_b</text>
+</svg>
+</div>
+
+<div class="formula">
+L_direct = w_NEE · [f(wi,wo) · Le · cosθ / p_NEE(wi)]
+         + w_BSDF · [f(wi,wo) · Le · cosθ / p_BSDF(wi)]
+</div>
+
+<p>权重用 <b>Power Heuristic（幂启发式，β=2）</b>：</p>
+<div class="formula">
+w_i(x) = p_i(x)^β  /  Σ_j p_j(x)^β
+
+// 对于 NEE 和 BSDF 两种策略：
+w_NEE(x)  = p_NEE(x)²  / (p_NEE(x)² + p_BSDF(x)²)
+w_BSDF(x) = p_BSDF(x)² / (p_NEE(x)² + p_BSDF(x)²)
+</div>
+
+<p>直觉上：哪种策略对这个采样点的 pdf 更高，它的权重就越大，说明它"更擅长"采到这个方向。</p>
+
+<!-- ============================================================ -->
+<h2>三、MIS 在不同场景下的效果</h2>
+
+<div class="cols">
+<div class="col">
+<div class="scene">
+<svg width="400" height="200">
+  <!-- 大光源 -->
+  <rect x="60" y="20" width="300" height="30" fill="#ffe066" rx="4" opacity="0.8"/>
+  <text x="170" y="63" fill="#ffe066" font-size="12">大面光源</text>
+
+  <!-- 漫反射面 -->
+  <rect x="30" y="160" width="340" height="10" fill="#5588aa" rx="2"/>
+
+  <!-- NEE（pdf 低，面积大）-->
+  <line x1="200" y1="160" x2="200" y2="50" stroke="#6bffb0" stroke-width="2"/>
+  <text x="210" y="115" fill="#6bffb0" font-size="11">NEE: p_NEE低</text>
+  <text x="210" y="129" fill="#6bffb0" font-size="11">w_NEE 适中</text>
+
+  <!-- BSDF（漫反射，任意方向均等）-->
+  <line x1="200" y1="160" x2="250" y2="50" stroke="#e0c96e" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="50" y="115" fill="#e0c96e" font-size="11">BSDF: p_BSDF低</text>
+  <text x="50" y="129" fill="#e0c96e" font-size="11">容易打到大光源</text>
+
+  <text x="80" y="185" fill="#6bffb0" font-size="11">两者都有效，MIS 均衡使用</text>
+</svg>
+</div>
+<div class="card green" style="font-size:13px">大光源 + 漫反射：NEE 和 BSDF 各贡献一半，方差都不大。</div>
+</div>
+
+<div class="col">
+<div class="scene">
+<svg width="400" height="200">
+  <!-- 小光源 -->
+  <ellipse cx="330" cy="35" rx="12" ry="8" fill="#ffe066"/>
+  <text x="305" y="58" fill="#ffe066" font-size="12">小光源</text>
+
+  <!-- 镜面波瓣（窄） -->
+  <ellipse cx="160" cy="158" rx="12" ry="80" fill="#6bb5ff22" stroke="#6bb5ff44" transform="rotate(-5 160 158)"/>
+
+  <!-- 漫反射/光滑面 -->
+  <rect x="30" y="160" width="340" height="10" fill="#88aacc" rx="2"/>
+
+  <!-- NEE：光源方向不在波瓣内，BSDF 值低 -->
+  <line x1="160" y1="160" x2="325" y2="40" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="200" y="90" fill="#ff6b6b" font-size="11">NEE: BSDF(wi)≈0</text>
+  <text x="200" y="104" fill="#ff6b6b" font-size="11">→ w_NEE 很小</text>
+
+  <!-- BSDF：波瓣内方向恰好命中 -->
+  <line x1="160" y1="160" x2="175" y2="50" stroke="#6bffb0" stroke-width="2.5"/>
+  <text x="30" y="90" fill="#6bffb0" font-size="11">BSDF 命中!</text>
+  <text x="30" y="104" fill="#6bffb0" font-size="11">p_BSDF 高</text>
+  <text x="30" y="118" fill="#6bffb0" font-size="11">w_BSDF 大</text>
+
+  <text x="50" y="185" fill="#6bffb0" font-size="11">MIS 自动侧重 BSDF 采样</text>
+</svg>
+</div>
+<div class="card green" style="font-size:13px">小光源 + 光滑材质：BSDF pdf 高，MIS 自动给 BSDF 更大权重，NEE 贡献极小但不浪费。</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>四、MIS 如何修改代码</h2>
+
+<p>当前代码流程（有问题）：</p>
+<div class="formula" style="color:#ff6b6b">
+漫反射面：
+  1. NEE → 加入 L（全权重）
+  2. BSDF 采样 → 如果命中光源，不算（丢失！）
+
+delta 面：
+  1. 跳过 NEE
+  2. BSDF 命中光源 → 全权重加入 L
+</div>
+
+<p>MIS 修改后的流程：</p>
+<div class="formula" style="color:#6bffb0">
+所有非 delta 面：
+  1. NEE 采样 x_l：
+     w_l = p_NEE² / (p_NEE² + p_BSDF(x_l)²)
+     L += beta * f * Le * cosθ * w_l / p_NEE
+
+  2. BSDF 采样 x_b → 如果命中光源：
+     w_b = p_BSDF² / (p_NEE(x_b)² + p_BSDF²)
+     L += beta * f * Le * cosθ * w_b / p_BSDF
+
+     （这里需要能计算光源在 x_b 方向的 p_NEE，
+      即 light_sampler 需提供 PDF 查询接口）
+</div>
+
+<table>
+  <tr><th>策略</th><th>采样谁</th><th>需要的 PDF</th><th>当前代码状态</th></tr>
+  <tr><td>NEE</td><td>光源上的点</td><td>p_NEE = prob × pdf_light</td><td style="color:#6bffb0">已有</td></tr>
+  <tr><td>BSDF</td><td>BSDF 分布的方向</td><td>p_BSDF = BSDFSample.pdf</td><td style="color:#6bffb0">已有</td></tr>
+  <tr><td>交叉查询</td><td>BSDF 样本在 NEE 下的 PDF</td><td>p_NEE(x_b) = 需要 LightSampler::Pdf()</td><td style="color:#ff6b6b">缺失</td></tr>
+  <tr><td>交叉查询</td><td>NEE 样本在 BSDF 下的 PDF</td><td>p_BSDF(x_l) = material.BSDF_PDF(wi)</td><td style="color:#ff6b6b">缺失</td></tr>
+</table>
+
+<div class="card blue">
+  <b>需要新增的接口</b>：<br>
+  1. <code>LightSampler::Pdf(light_direction, hit_point)</code> — 查询给定方向的 NEE 采样概率密度<br>
+  2. <code>Material::BSDFPdf(wi, wo)</code> — 查询给定方向对 BSDF 采样的概率密度<br>
+  这两个接口补齐后，就能完整实现 MIS。
+</div>
+
+<!-- ============================================================ -->
+<h2>五、MIS 的数学保证</h2>
+<p>MIS 是无偏的（期望值等于真实积分）：</p>
+<div class="formula">
+E[Σ_i w_i(x_i) · f(x_i) / p_i(x_i)] = ∫ f(x) dx
+
+// 因为 Σ_i w_i(x) = 1，对任意 x 成立
+</div>
+<p>同时方差远低于单策略：当某策略 pdf 高时，其权重大，其他策略权重自动缩小，避免了高方差样本的影响。</p>
+
+<div class="card" style="border-left-color:#888; margin-top:24px; font-size:13px">
+  <b>总结</b><br>
+  当前问题：漫反射 BSDF 命中光源的贡献被完全丢弃，且没有权重，方差大<br>
+  MIS 解决：两种策略各出样本，按 PDF 高低自动分配权重，既不丢失贡献也不重复计算<br>
+  实现代价：需要补充 PDF 查询接口，代码量不大但需要设计好接口
+</div>
+
+</body>
+</html>

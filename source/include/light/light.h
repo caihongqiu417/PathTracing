@@ -27,10 +27,10 @@ public:
 
 	// 从光源表面重要性采样一个方向，返回 LightSample
 	virtual std::optional<LightSample> SampleLight(const glm::vec3& surface_point, float scene_radius,
-		const Rng& rng)const;
+			Rng& rng)const;
 
 	// 返回光源在 light_point 处朝向 surface_point（被着色点）的辐射亮度
-	virtual glm::vec3 GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point)const { return Le; }
+	virtual glm::vec3 GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point,const glm::vec3& normal)const { return Le; }
 protected:
 	glm::vec3 Le; 
 };

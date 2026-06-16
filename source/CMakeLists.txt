@@ -9,6 +9,8 @@ file(GLOB source_thread CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/thread/*.
 file(GLOB source_util CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/util/*.cpp")
 file(GLOB source_accelerate CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/accelerate/*.cpp")
 file(GLOB source_material  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/material/*.cpp")
+file(GLOB source_light     CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/light/*.cpp")
+file(GLOB source_sample    CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/sample/*.cpp")
 
 set(source
 	${source_main}
@@ -19,6 +21,8 @@ set(source
 	${source_util}
 	${source_accelerate}
 	${source_material}
+	${source_light}
+	${source_sample}
 )
 
 add_executable(PathTracing ${source})
@@ -31,6 +35,8 @@ target_include_directories(PathTracing PUBLIC
 	include/thread
 	include/util
 	include/accelerate
+	include/light
+	include/sample
 	material
 	${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/rapidobj/include
 )

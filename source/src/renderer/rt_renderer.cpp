@@ -17,7 +17,9 @@ glm::vec3 RTRenderer::RenderPixel(const glm::ivec2& pixel_coord)
         auto hit_info = scene.Intersect(ray);
         if (!hit_info.has_value()) break;
 
-        color += beta * hit_info->material->emissive;
+        if (hit_info->material->area_light)
+            color += beta * hit_info->material->area_light->GetRadiance(
+                ray.origin, hit_info->point, hit_info->normal);
 
         Frame     frame(hit_info->normal);
         glm::vec3 view_local = frame.LocalFromWorld(-ray.direction);
