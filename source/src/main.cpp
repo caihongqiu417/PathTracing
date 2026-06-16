@@ -111,7 +111,7 @@ int main()
 	// 光源：放在场景上方，对所有物体都有好的可见度
 	auto light = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
 	light->SetEmissive({ 10.f, 8.f, 4.f });
-	scene.AddShape(sphere, light, { 0.f, 3.f, 1.f }, { 1.5f, 1.5f, 1.5f });
+	scene.AddShape(sphere, light, { 0.f, 3.f, 1.f }, { .5f, .5f, .5f });
 
 	// -----------------------------------------------------------------------
 	// 原中世纪场景（暂时注释）
