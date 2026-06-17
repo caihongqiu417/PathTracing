@@ -29,6 +29,7 @@ public:
 	// 获取面积光的形状
 	const Shape& GetShape() const { return shape; }
 
+	virtual float GetPDF(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal)const override;
 private:
 	const Shape& shape;
 	bool double_side;

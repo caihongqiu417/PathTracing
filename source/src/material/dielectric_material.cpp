@@ -151,3 +151,68 @@ std::optional<BSDFSample> DielectricMaterial::SampleBSDF(
     float w = g2_over_g1(wi_upper);
     return BSDFSample{albedo_t * w / cos_t_abs, 1.f, wi};
 }
+
+// Delta 电介质（光滑玻璃）：delta 分布，返回 1
+// 粗糙电介质（VNDF 采样 + 菲涅耳随机分支）：
+//   反射（ωi、ωo 同侧）：
+//     wh = normalize(ωo_upper + ωi_upper)
+//     p(ωi) = F · D_VNDF(wo, wh) / (4·dot(wo,wh))
+//   折射（ωi、ωo 异侧）：
+//     wh = normalize(ωo_upper + η·ωi_upper)
+//     雅可比 |dwh/dωi| = η²·|dot(wi,wh)| / (dot(wo,wh) + η·|dot(wi,wh)|)²
+//     p(ωi) = (1-F) · D_VNDF(wo, wh) · η²·|dot(wi,wh)| / (dot(wo,wh) + η·|dot(wi,wh)|)²
+float DielectricMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction)
+{
+    if (microfact_theory.IsDeltaDistribution()) return 0.f;
+
+    bool      entering = view_direction.y > 0.f;
+    float     eta      = entering ? ior : (1.f / ior);
+    glm::vec3 wo_upper = entering ? view_direction : -view_direction;
+
+    bool is_reflection = (light_direction.y > 0.f) == (view_direction.y > 0.f);
+
+    // 内联菲涅耳计算
+    auto fresnel = [&](float cos_o) -> float {
+        float sin2_o = 1.f - cos_o * cos_o;
+        float sin2_t = sin2_o / (eta * eta);
+        if (sin2_t >= 1.f) return 1.f;  // 全内反射
+        float cos_t  = glm::sqrt(1.f - sin2_t);
+        float r_parl = (eta * cos_o - cos_t) / (eta * cos_o + cos_t);
+        float r_perp = (cos_o - eta * cos_t) / (cos_o + eta * cos_t);
+        return 0.5f * (r_parl * r_parl + r_perp * r_perp);
+    };
+
+    if (is_reflection)
+    {
+        glm::vec3 wi_upper = entering ? light_direction : -light_direction;
+        if (wi_upper.y <= 0.f) return 0.f;
+
+        glm::vec3 wh = glm::normalize(wi_upper + wo_upper);
+        if (wh.y <= 0.f) return 0.f;
+
+        float cos_o = glm::dot(wo_upper, wh);
+        if (cos_o <= 0.f) return 0.f;
+
+        float F = fresnel(cos_o);
+        return F * microfact_theory.VisibleNormalDistribution(wo_upper, wh) / (4.f * cos_o);
+    }
+    else
+    {
+        glm::vec3 wi_upper = entering ? -light_direction : light_direction;
+        if (wi_upper.y <= 0.f) return 0.f;
+
+        glm::vec3 wh = glm::normalize(wo_upper + eta * wi_upper);
+        if (wh.y <= 0.f) wh = -wh;
+
+        float cos_o = glm::dot(wo_upper, wh);
+        float cos_i = glm::dot(wi_upper, wh);
+        if (cos_o <= 0.f || cos_i <= 0.f) return 0.f;
+
+        float denom = cos_o + eta * cos_i;
+        if (denom == 0.f) return 0.f;
+
+        float F        = fresnel(cos_o);
+        float jacobian = eta * eta * cos_i / (denom * denom);
+        return (1.f - F) * microfact_theory.VisibleNormalDistribution(wo_upper, wh) * jacobian;
+    }
+}

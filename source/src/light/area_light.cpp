@@ -44,3 +44,17 @@ glm::vec3 AreaLight::GetRadiance(const glm::vec3& surface_point, const glm::vec3
 
     return Le;
 }
+
+float AreaLight::GetPDF(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal) const
+{
+	//PDF：p_ω = p_A × r² / |cosθ|
+	//			det_J = |cosθ| / r²
+	float cos_theta = glm::dot(surface_point - light_point, normal);
+	if ((!double_side) && (cos_theta <= 0))
+		return 0;
+
+	glm::vec3 light_direction_raw = light_point - surface_point;
+	float det_J = glm::abs(cos_theta) / glm::dot(light_direction_raw, light_direction_raw); // |cosθ| / r²
+	return shape.PDF(surface_point, normal) / det_J;
+}
+

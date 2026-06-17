@@ -109,3 +109,25 @@ std::optional<BSDFSample> ConductorMaterial::SampleBSDF(
 
     return BSDFSample{F * g2_g1 / cos_i, 1.f, wi};
 }
+
+// Delta 导体（光滑镜面）：delta 分布，返回 1（配合 SampleBSDF 中 pdf=1 的权重使用）
+// 粗糙导体（VNDF 采样）：
+//   wh = normalize(ωi + ωo)（反射半向量）
+//   p(wh) = D_VNDF(wo, wh) = D(wh) · G1(wo,wh) · dot(wo,wh) / cos(θo)
+//   雅可比 |dwh/dωi| = 1 / (4·dot(wo,wh))
+//   p(ωi) = D_VNDF(wo, wh) / (4·dot(wo,wh))
+float ConductorMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction)
+{
+    if (microfact_theory.IsDeltaDistribution()) return 0.f;
+
+    glm::vec3 wo = view_direction.y  > 0.f ? view_direction  : -view_direction;
+    glm::vec3 wi = light_direction.y > 0.f ? light_direction : -light_direction;
+
+    glm::vec3 wh = glm::normalize(wi + wo);
+    if (wh.y <= 0.f) return 0.f;
+
+    float cos_wh = glm::dot(wo, wh);
+    if (cos_wh <= 0.f) return 0.f;
+
+    return microfact_theory.VisibleNormalDistribution(wo, wh) / (4.f * cos_wh);
+}

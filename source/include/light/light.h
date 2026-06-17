@@ -30,7 +30,10 @@ public:
 			Rng& rng)const;
 
 	// 返回光源在 light_point 处朝向 surface_point（被着色点）的辐射亮度
-	virtual glm::vec3 GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point,const glm::vec3& normal)const { return Le; }
+	virtual glm::vec3 GetRadiance(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal)const { return Le; }
+
+	//获取概率密度
+	virtual float GetPDF(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal)const = 0;
 protected:
 	glm::vec3 Le; 
 };

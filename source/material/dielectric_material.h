@@ -28,6 +28,10 @@ public:
 
 	glm::vec3 BSDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const override;
 
+	// 反射（ωi、ωo 同侧）：p(ωi) = F · D_VNDF(wo, wh) / (4·dot(wo,wh))
+	// 折射（ωi、ωo 异侧）：p(ωi) = (1-F) · D_VNDF(wo, wh) · η²·|dot(wi,wh)| / (dot(wo,wh) + η·|dot(wi,wh)|)²
+	// Delta 电介质：返回 1
+	float PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) override;
 
     // Delta分布: 只有一个反射方向
 	virtual bool IsDeltaDistribution()const override { return microfact_theory.IsDeltaDistribution(); }

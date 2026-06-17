@@ -24,3 +24,10 @@ std::optional<LightSample> InfiniteLight::SampleLight(const glm::vec3& surface_p
 
     return LightSample{ light_point, direction, Le, pdf };
 }
+
+// 均匀球面采样：p(ω) = 1 / (4π)
+// 与采样点/法线无关，直接返回常数
+float InfiniteLight::GetPDF(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal) const
+{
+    return 1.f / (4.f * glm::pi<float>());
+}

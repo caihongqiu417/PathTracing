@@ -15,4 +15,7 @@ public:
 	// 从光源表面重要性采样一个方向，返回采样点
 	virtual std::optional<LightSample> SampleLight(const glm::vec3& surface_point, float scene_radius,
 													Rng& rng)const override;
+
+	// 均匀球面采样：PDF = 1 / (4π)（与方向无关）
+	virtual float GetPDF(const glm::vec3& surface_point, const glm::vec3& light_point, const glm::vec3& normal)const override;
 };
