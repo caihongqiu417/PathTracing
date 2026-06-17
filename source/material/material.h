@@ -56,8 +56,8 @@ public:
         const glm::vec3& view_direction  // 出射方向 ωo（表面 → 观察者）
     ) const = 0;
 
-    // 返回概率密度
-    virtual float PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction);
+    // 返回概率密度；delta 材质默认返回 0（NEE 不适用，MIS 权重退化为 1）
+    virtual float PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const { return 0.f; }
 
     // Delta 分布：只有唯一一个合法入射方向（镜面 / 电介质 / 导体）
     // 积分器据此跳过直接光照的 BSDF 评估，只走 SampleBSDF 路径

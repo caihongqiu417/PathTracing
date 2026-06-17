@@ -1,183 +1,98 @@
 #include <windows.h>
-#undef RGB  // windows.h 定义了 RGB(r,g,b) 宏，会和项目的 RGB 类冲突
+#undef RGB
+
 #include "camera/camera.h"
 #include "camera/film.h"
-#include "renderer/debug_renderer.h"
-#include "renderer/normal_renderer.h"
-#include "renderer/rt_renderer.h"
 #include "renderer/path_tracing_renderer.h"
-#include "shape/model.h"
+#include "renderer/mis_path_tracing_renderer.h"
 #include "shape/plane.h"
 #include "shape/scene.h"
 #include "shape/sphere.h"
 #include "util/rgb.h"
 #include "diffuse_material.h"
-#include "specular_material.h"
-#include "dielectric_material.h"
 #include "conductor_material.h"
 #include "light/area_light.h"
 
-// =========================
-// 程序入口
-// =========================
-
 int main()
 {
-	SetConsoleOutputCP(CP_UTF8);
-	constexpr size_t width = 1920;
-	constexpr size_t height = 1080;
-	constexpr size_t spp = 64;
+    SetConsoleOutputCP(CP_UTF8);
 
-	Sphere sphere{ { 0, 0, 0 }, .5f };
-	Plane ground{ { 0, -1, 0 }, { 0, 1, 0 }, 20.f };
-	Plane back_wall{ { 0, 0, -3 }, { 0, 0, 1 }, 20.f };
-	Plane glass_wall{ { 0, 0, 0 }, { -1, 0, 0 }, 20.f };
+    constexpr size_t width  = 1280;
+    constexpr size_t height = 720;
+    constexpr size_t spp    = 64;
 
-	Scene scene{};
+    Sphere unit_sphere{ {0, 0, 0}, 0.5f };
+    Plane  floor_plane{ {0, -1,  0}, {0,  1, 0}, 30.f };
+    Plane  back_plane { {0,  0, -10}, {0,  0, 1}, 30.f };
+    Plane  left_plane { {-5, 0,  0}, { 1, 0, 0}, 30.f };
+    Plane  right_plane{ { 5, 0,  0}, {-1, 0, 0}, 30.f };
 
-	// -----------------------------------------------------------------------
-	// 电介质测试场景
-	// -----------------------------------------------------------------------
+    Scene scene{};
 
-	// 地面：漫反射，透过玻璃能看到底色
-	scene.AddShape(ground,
-		std::make_shared<DiffuseMaterial>(RGB{ 80, 120, 80 }),
-		{ 0, 0, 0 });
+    // ── 地面：光滑导体，roughness=0.08，BSDF 峰值窄（约 ±8°）
+    scene.AddShape(floor_plane,
+        std::make_shared<ConductorMaterial>(
+            glm::vec3{ 2.4f, 2.4f, 2.4f },
+            glm::vec3{ 3.4f, 3.4f, 3.4f },
+            0.08f, 0.08f),
+        { 0, 0, 0 });
 
-	// 背景墙：漫反射，方便观察折射变形
-	scene.AddShape(back_wall,
-		std::make_shared<DiffuseMaterial>(RGB{ 180, 60, 60 }),
-		{ 0, 0, 0 });
+    // ── 后墙、左右墙
+    scene.AddShape(back_plane,
+        std::make_shared<DiffuseMaterial>(RGB{ 180, 180, 175 }),
+        { 0, 0, 0 });
+    scene.AddShape(left_plane,
+        std::make_shared<DiffuseMaterial>(RGB{ 185, 55, 50 }),
+        { 0, 0, 0 });
+    scene.AddShape(right_plane,
+        std::make_shared<DiffuseMaterial>(RGB{ 50, 75, 190 }),
+        { 0, 0, 0 });
 
-	// 中央：抛光玻璃 (ior=1.5, roughness=0.05) — 近似光滑，背景折射清晰
-	scene.AddShape(sphere,
-		std::make_shared<DielectricMaterial>(1.5f, glm::vec3{ 1, 1, 1 }, 0.05f, 0.05f),
-		{ 0, 0, 0 });
+    // ── 漫反射球（左侧，参照）：两种渲染器结果相近
+    scene.AddShape(unit_sphere,
+        std::make_shared<DiffuseMaterial>(RGB{ 240, 200, 120 }),
+        { -2.5f, -0.5f, -1.f });
 
-	// 左侧：磨砂水 (ior=1.33, roughness=0.25) — 轻微模糊，折射像涟漪水面
-	scene.AddShape(sphere,
-		std::make_shared<DielectricMaterial>(1.33f, glm::vec3{ 1, 1, 1 }, 0.25f, 0.25f),
-		{ -0.8f, -0.35f, 0.8f }, { 0.6f, 0.6f, 0.6f });
+    // ── 金色导体球（右侧）：roughness=0.08，同样受益于 MIS
+    scene.AddShape(unit_sphere,
+        std::make_shared<ConductorMaterial>(
+            glm::vec3{ 0.17f, 0.35f, 1.5f },
+            glm::vec3{ 3.1f,  2.4f, 1.9f },
+            0.08f, 0.08f),
+        { 2.5f, -0.5f, -1.f });
 
-	// 右侧：磨砂玻璃 (ior=2.0, roughness=0.5) — 明显磨砂，背景几乎全部散开
-	scene.AddShape(sphere,
-		std::make_shared<DielectricMaterial>(2.0f, glm::vec3{ 1, 1, 1 }, 0.5f, 0.5f),
-		{ 1.6f, -0.35f, -0.8f }, { 0.6f, 0.6f, 0.6f });
+    // ── 大背景光：(0, 0, -7)，scale=2 → 球半径 1
+    //    经过精确计算，此光源位于地面镜面反射方向上（偏差 <3°）
+    //    相机 → 地面的反射方向 ≈ (0, 0.275, -0.961)
+    //    地面中心 → 光源方向  ≈ (0, 0.293, -0.956)
+    AreaLight main_light{ unit_sphere, glm::vec3{ 0.8f, 0.8f, 0.65f }, false };
+    auto main_light_mat = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
+    scene.AddAreaLight(&main_light, main_light_mat, { 0.f, 0.f, -7.f }, { 2.f, 2.f, 2.f });
 
-	// 后方：磨砂蓝色玻璃 (ior=1.5, roughness=0.35)
-	scene.AddShape(sphere,
-		std::make_shared<DielectricMaterial>(
-			1.5f,
-			glm::vec3{ 1, 1, 1 },
-			glm::vec3{ 0.7f, 0.85f, 1.0f },
-			0.35f, 0.35f),
-		{ 0, 0.5f, -1.2f }, { 0.5f, 0.5f, 0.5f });
+    // ── 小补光：右上方，高亮度、极小立体角
+    //    NEE 容易定位，BSDF 几乎采不到，两种渲染器对此光源表现一致
+    AreaLight fill_light{ unit_sphere, glm::vec3{ 18.f, 14.f, 8.f }, false };
+    auto fill_light_mat = std::make_shared<DiffuseMaterial>(glm::vec3{ 1, 1, 1 });
+    scene.AddAreaLight(&fill_light, fill_light_mat, { 3.f, 2.5f, 2.f }, { 0.1f, 0.1f, 0.1f });
 
-	// 竖直玻璃平面（暂时注释掉，先测试球体效果）
-	// scene.AddShape(glass_wall,
-	// 	std::make_shared<DielectricMaterial>(1.5f, glm::vec3{ 1, 1, 1 }),
-	// 	{ -1.5f, 0, 0 });
+    scene.Build();
 
-	// -----------------------------------------------------------------------
-	// 导体测试场景（紧靠电介质球右侧，便于对比）
-	// -----------------------------------------------------------------------
+    const glm::vec3 cam_pos    = { 0.f, 1.5f, 5.f };
+    const glm::vec3 cam_target = { 0.f, -0.5f, -2.f };
+    constexpr float fovy       = 55.f;
 
-	// 导体球：沿 x 轴展开（-2 / 0 / +2），抬高到 y=1 浮于玻璃球上方
-	// z=0 与玻璃球同深度，避免和相机 z=2 挤在一起
+    {
+        Film film{ width, height };
+        Camera camera{ film, cam_pos, cam_target, fovy };
+        PathTracingRenderer renderer{ camera, scene };
+        renderer.Render(spp, "Compare_NEE.ppm");
+    }
+    {
+        Film film{ width, height };
+        Camera camera{ film, cam_pos, cam_target, fovy };
+        MISPathTracingRenderer renderer{ camera, scene };
+        renderer.Render(spp, "Compare_MIS.ppm");
+    }
 
-	// 红色金属，polished (roughness=0.05) — 近镜面，可见清晰高光点
-	scene.AddShape(sphere,
-		std::make_shared<ConductorMaterial>(
-			glm::vec3{ 0.2f, 1.0f, 1.0f },
-			glm::vec3{ 3.5f, 0.1f, 0.1f },
-			0.05f, 0.05f),
-		{ -2.f, 1.f, 0.f });
-
-	// 绿色金属，satin (roughness=0.3) — 拉长的模糊高光，磨砂金属感
-	scene.AddShape(sphere,
-		std::make_shared<ConductorMaterial>(
-			glm::vec3{ 1.0f, 0.2f, 1.0f },
-			glm::vec3{ 0.1f, 3.5f, 0.1f },
-			0.3f, 0.3f),
-		{ 0.f, 1.f, 0.f });
-
-	// 蓝色金属，rough (roughness=0.6) — 高光极宽，接近漫反射金属
-	scene.AddShape(sphere,
-		std::make_shared<ConductorMaterial>(
-			glm::vec3{ 1.0f, 1.0f, 0.2f },
-			glm::vec3{ 0.1f, 0.1f, 3.5f },
-			0.6f, 0.6f),
-		{ 2.f, 1.f, 0.f });
-
-	// 光源：放在场景上方，对所有物体都有好的可见度
-	AreaLight area_light{ sphere, { 10.f, 8.f, 4.f }, false };
-	auto light_mat = std::make_shared<DiffuseMaterial>(glm::vec3{ 1.f, 1.f, 1.f });
-	scene.AddAreaLight(&area_light, light_mat, { 0.f, 3.f, 1.f }, { .5f, .5f, .5f });
-
-	// -----------------------------------------------------------------------
-	// 原中世纪场景（暂时注释）
-	// -----------------------------------------------------------------------
-	// Model model("models/dragon_87k.obj");
-	// scene.AddShape(model,
-	// 	std::make_shared<DiffuseMaterial>(RGB{190, 45, 25}),
-	// 	{ 0, 0, 0 }, { 1, 3, 2 });
-	// scene.AddShape(sphere,
-	// 	std::make_shared<DiffuseMaterial>(RGB{230, 185, 40}),
-	// 	{ 0, 0, 2.5 });
-	// scene.AddShape(sphere,
-	// 	std::make_shared<DiffuseMaterial>(RGB{230, 185, 40}),
-	// 	{ 0, 0, -2.5 });
-	// scene.AddShape(sphere,
-	// 	std::make_shared<SpecularMaterial>(glm::vec3{1, 1, 1}),
-	// 	{ 3, 0.5, -2 });
-	// scene.AddShape(sphere,
-	// 	std::make_shared<SpecularMaterial>(glm::vec3{1, 1, 1}),
-	// 	{ 3, 0.5,  2 });
-	// auto warm_light = std::make_shared<DiffuseMaterial>(glm::vec3{1, 1, 1});
-	// warm_light->SetEmissive({ 7.f, 4.f, 0.8f });
-	// scene.AddShape(sphere, warm_light, { -2, 3, 0 }, { 3, 3, 3 });
-	// auto cool_light = std::make_shared<DiffuseMaterial>(glm::vec3{1, 1, 1});
-	// cool_light->SetEmissive({ 0.6f, 1.0f, 3.5f });
-	// scene.AddShape(sphere, cool_light, { 5, 3, -3 }, { 2, 2, 2 });
-	// scene.AddShape(plane,
-	// 	std::make_shared<DiffuseMaterial>(RGB{140, 130, 120}),
-	// 	{ 0, -0.5, 0 });
-
-	scene.Build();
-
-	// 路径追踪图
-	Film pt_film{ width, height };
-	Camera pt_camera{ pt_film, { -4.f, 0.5f, 2.f }, { 0, 0, 0 }, 45.f };
-	PathTracingRenderer pt_renderer{ pt_camera, scene };
-	pt_renderer.Render(spp, "Output.ppm");
-
-	// 简单光追图
-	//Film rt_film{ width, height };
-	//Camera rt_camera{ rt_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	//RTRenderer rt_renderer{ rt_camera, scene };
-	//rt_renderer.Render(spp, "Output_rt.ppm");
-
-	// Debug 热力图
-	//Film bounds_test_film{ width, height };
-	//Camera bounds_test_camera{ bounds_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	//BoundsTestRenderer bounds_test_renderer{ bounds_test_camera, scene };
-	//bounds_test_renderer.Render(4, "BoundsTest.ppm");
-
-	//Film triangle_test_film{ width, height };
-	//Camera triangle_test_camera{ triangle_test_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	//TriangleTestRenderer triangle_test_renderer{ triangle_test_camera, scene };
-	//triangle_test_renderer.Render(4, "TriangleTest.ppm");
-
-	//Film bounds_depth_film{ width, height };
-	//Camera bounds_depth_camera{ bounds_depth_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	//BoundsDepthRenderer bounds_depth_renderer{ bounds_depth_camera, scene };
-	//bounds_depth_renderer.Render(4, "BoundsDepth.ppm");
-
-	// 法线图
-	//Film normal_film{ width, height };
-	//Camera normal_camera{ normal_film, { -3.6, 0, 0 }, { 0, 0, 0 }, 45.f };
-	//NormalRenderer normal_renderer{ normal_camera, scene };
-	//normal_renderer.Render(1, "Normal.ppm");
-
-	return 0;
+    return 0;
 }

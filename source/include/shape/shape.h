@@ -38,4 +38,7 @@ public:
 	// 在几何体表面均匀采样一个点，用于直接光照（面光源采样）
 	// 返回采样点的世界坐标、法线及对应 pdf；子类不实现则返回空（不可作面光源）
 	virtual std::optional<ShapeSample> SampleShape(Rng& rng)const { return {}; }
+
+	//获取某个采样点对应的概率密度
+	virtual float PDF(const glm::vec3& point, const glm::vec3& normal)const { return 1.f / GetArea(); }
 };

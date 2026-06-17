@@ -40,6 +40,8 @@ public:
 	// u 为 [0,1) 均匀随机数，返回按权重采样的事件下标及该事件的归一化概率
 	SampleResult Sample(float u) const;
 
+	const std::vector<float>& GetProbs()const { return probs; }
+
 private:
 	std::vector<float> probs; // 归一化概率，probs[i] = values[i] / sum
 	std::vector<Item>  items; // 别名表

@@ -116,7 +116,7 @@ std::optional<BSDFSample> ConductorMaterial::SampleBSDF(
 //   p(wh) = D_VNDF(wo, wh) = D(wh) · G1(wo,wh) · dot(wo,wh) / cos(θo)
 //   雅可比 |dwh/dωi| = 1 / (4·dot(wo,wh))
 //   p(ωi) = D_VNDF(wo, wh) / (4·dot(wo,wh))
-float ConductorMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction)
+float ConductorMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const
 {
     if (microfact_theory.IsDeltaDistribution()) return 0.f;
 

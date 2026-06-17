@@ -161,7 +161,7 @@ std::optional<BSDFSample> DielectricMaterial::SampleBSDF(
 //     wh = normalize(ωo_upper + η·ωi_upper)
 //     雅可比 |dwh/dωi| = η²·|dot(wi,wh)| / (dot(wo,wh) + η·|dot(wi,wh)|)²
 //     p(ωi) = (1-F) · D_VNDF(wo, wh) · η²·|dot(wi,wh)| / (dot(wo,wh) + η·|dot(wi,wh)|)²
-float DielectricMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction)
+float DielectricMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const
 {
     if (microfact_theory.IsDeltaDistribution()) return 0.f;
 

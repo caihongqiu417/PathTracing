@@ -20,7 +20,7 @@ public:
 
 	// 粗糙导体：VNDF 重要性采样，p(ωi) = D_VNDF(wo, wh) / (4·dot(wo,wh))
 	// Delta 导体：退化为 delta 分布，返回 1
-	float PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) override;
+	float PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const override;
 
     // Delta分布: 只有一个反射方向
 	virtual bool IsDeltaDistribution()const override { return microfact_theory.IsDeltaDistribution(); }

@@ -36,7 +36,7 @@ std::optional<BSDFSample> DiffuseMaterial::SampleBSDF(
 
 // 余弦重要性采样：p(ωi) = cos(θi) / π
 // cos(θi) = ωi.y（局部坐标系，y 轴 = 宏表面法线）
-float DiffuseMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction)
+float DiffuseMaterial::PDF(const glm::vec3& hit_point, const glm::vec3& light_direction, const glm::vec3& view_direction) const
 {
     if (light_direction.y <= 0.f) return 0.f;
     return light_direction.y / glm::pi<float>();

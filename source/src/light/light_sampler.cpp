@@ -30,7 +30,3 @@ std::optional<LightSourceSample> LightSampler::Sample(float u)const {
 	return LightSourceSample{ lights[sample_result.index],sample_result.prob };
 }
 
-float LightSampler::GetProb(const Light* light) const
-{
-    return 0.0f;
-}
